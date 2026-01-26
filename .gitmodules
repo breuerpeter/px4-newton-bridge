@@ -1,0 +1,3 @@
+[submodule "newton"]
+	path = newton
+	url = git@github.com:breuerpeter/newton.git
