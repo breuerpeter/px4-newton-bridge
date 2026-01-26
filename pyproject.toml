@@ -17,10 +17,6 @@ dependencies = [
     "rerun-sdk>=0.27.1",
 ]
 
-[tool.uv]
-# Pin mujoco to version with Python 3.10/3.11 x86_64 wheels
-constraint-dependencies = ["mujoco==3.4.1.dev851315742"]
-
 [tool.uv.sources]
 newton = { path = "./newton", editable = true }
 
