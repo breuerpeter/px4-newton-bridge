@@ -72,24 +72,30 @@ class MAVLinkInterface:
             )
             self.last_hb_time = now
 
-    def receive_actuator_controls(self):
+    def receive_actuator_controls(self, timeout: float = 0.1) -> bool:
         """
         Receive actuator controls (HIL_ACTUATOR_CONTROLS) message from PX4.
+
+        Blocks until actuator controls are received or timeout expires.
+        This is required for proper lockstep synchronization with PX4.
+
+        Args:
+            timeout: Maximum time to wait for message in seconds.
+
+        Returns:
+            True if actuator controls were received, False if timeout.
         """
-        msg = self.mav.recv_match(blocking=False)
+        msg = self.mav.recv_match(
+            type="HIL_ACTUATOR_CONTROLS",
+            blocking=True,
+            timeout=timeout,
+        )
 
-        while msg is not None:
-            msg_type = msg.get_type()
+        if msg is not None:
+            self.actuator_controls = list(msg.controls)
+            return True
 
-            if msg_type == "HIL_ACTUATOR_CONTROLS":
-                self.actuator_controls = list(msg.controls)
-                # print(self.actuator_controls)
-
-            elif msg_type == "HEARTBEAT":
-                pass
-
-            # Purge other messages in receive buffer
-            msg = self.mav.recv_match(blocking=False)
+        return False
 
     def send_hil_sensor(
         self,
@@ -447,22 +453,36 @@ class Drone:
 
         print(f"control dim {self.model.joint_dof_count}")
 
+        # Pre-allocate Warp array for joint forces (used by CUDA graph)
+        # joint_f format: [fx, fy, fz, tx, ty, tz] in world frame
+        self._joint_f_buffer = wp.zeros(6, dtype=wp.float32, device=wp.get_device())
+
         self.capture()
 
     def capture(self):
+        """Capture CUDA graph for physics substeps only (no I/O)."""
         self.graph = None
-        # TODO: make CUDA graph capture work with MAVLink I/O
-        # if wp.get_device().is_cuda:
-        #     with wp.ScopedCapture() as capture:
-        #         self.simulate()
-        #     self.graph = capture.graph
+        if wp.get_device().is_cuda and wp.is_mempool_enabled(wp.get_device()):
+            print("[INFO] Using CUDA graph for physics simulation")
+            with wp.ScopedCapture() as capture:
+                self._simulate_physics()
+            self.graph = capture.graph
+        else:
+            print("[INFO] CUDA graph not available, using standard simulation")
 
-    def simulate(self):
-        self.mavlink.send_heartbeat()
-        self.mavlink.receive_actuator_controls()
+    def _simulate_physics(self):
+        """Run physics substeps only - suitable for CUDA graph capture."""
+        for _ in range(self.sim_substeps):
+            self.state0.clear_forces()
+            self.control.joint_f.assign(self._joint_f_buffer)
+            self.contacts = self.model.collide(self.state0)
+            self.solver.step(
+                self.state0, self.state1, self.control, self.contacts, self.sim_dt
+            )
+            self.state0, self.state1 = self.state1, self.state0
 
-        # Convert actuator commands to thrust forces and torques
-        # PX4 sends normalized values [0, 1] for motors
+    def _compute_forces_from_actuators(self):
+        """Convert actuator commands to thrust forces and torques in world frame."""
         total_thrust = 0.0
         torque_x = 0.0  # Roll
         torque_y = 0.0  # Pitch
@@ -485,38 +505,56 @@ class Drone:
             # Yaw torque from motor reaction (opposite to spin direction)
             torque_z += -self.motor_spin_dirs[i] * self.motor_torque_coeff * thrust
 
-            # Extract body rotation quaternion (XYZW format from body_q transform)
-            body_rot = wp.quat(self.state0.body_q.numpy()[0, 3:7])
+        # Extract body rotation quaternion (XYZW format from body_q transform)
+        body_rot = wp.quat(self.state0.body_q.numpy()[0, 3:7])
 
-            # Forces in body frame [fx, fy, fz, tx, ty, tz]
-            joint_f_b = [0.0, 0.0, total_thrust, torque_x, torque_y, torque_z]
+        # Forces in body frame [fx, fy, fz, tx, ty, tz]
+        joint_f_b = [0.0, 0.0, total_thrust, torque_x, torque_y, torque_z]
 
-            # Rotate linear force from body to world frame
-            force_world = wp.quat_rotate(body_rot, wp.vec3(joint_f_b[:3]))
+        # Rotate linear force from body to world frame
+        force_world = wp.quat_rotate(body_rot, wp.vec3(joint_f_b[:3]))
 
-            # Rotate angular torque from body to world frame
-            torque_world = wp.quat_rotate(body_rot, wp.vec3(joint_f_b[3:]))
+        # Rotate angular torque from body to world frame
+        torque_world = wp.quat_rotate(body_rot, wp.vec3(joint_f_b[3:]))
 
-            # Combine into world-frame joint forces array
-            joint_f_world = [
-                force_world[0],
-                force_world[1],
-                force_world[2],
-                torque_world[0],
-                torque_world[1],
-                torque_world[2],
-            ]
+        return [
+            force_world[0],
+            force_world[1],
+            force_world[2],
+            torque_world[0],
+            torque_world[1],
+            torque_world[2],
+        ]
 
-        for _ in range(self.sim_substeps):
-            self.state0.clear_forces()
-            self.control.joint_f.assign(joint_f_world)
-            self.contacts = self.model.collide(self.state0)
-            self.solver.step(
-                self.state0, self.state1, self.control, self.contacts, self.sim_dt
-            )
-            self.state0, self.state1 = self.state1, self.state0
+    def simulate(self):
+        """Full simulation step including MAVLink I/O and physics.
 
+        Implements lockstep synchronization with PX4:
+        1. Send current sensor data to PX4
+        2. Wait (blocking) for actuator controls from PX4
+        3. Run physics with received controls
+        """
+        self.mavlink.send_heartbeat()
+
+        # Send sensor data first - this triggers PX4 to compute actuator controls
         self._send_sensor_data()
+
+        # Block waiting for actuator controls (lockstep synchronization)
+        if not self.mavlink.receive_actuator_controls(timeout=0.5):
+            # Timeout - PX4 may be slow or disconnected, continue with previous controls
+            pass
+
+        # Compute forces from actuator commands (CPU, before graph launch)
+        joint_f_world = self._compute_forces_from_actuators()
+
+        # Update the force buffer used by physics simulation
+        self._joint_f_buffer.assign(joint_f_world)
+
+        # Run physics (uses CUDA graph if available)
+        if self.graph:
+            wp.capture_launch(self.graph)
+        else:
+            self._simulate_physics()
 
     def _send_sensor_data(self):
         """Send simulated sensor data to PX4."""
@@ -697,10 +735,8 @@ class Drone:
         # Increment sim_time BEFORE simulate() so sensor data has non-zero timestamps
         self.sim_time += self.frame_dt
 
-        if self.graph:
-            wp.capture_launch(self.graph)
-        else:
-            self.simulate()
+        # simulate() handles I/O and physics (with CUDA graph if available)
+        self.simulate()
 
         # Check if PX4 disconnected and exit if so
 
