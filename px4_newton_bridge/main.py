@@ -257,11 +257,9 @@ class Drone:
         self,
         viewer: ViewerGL | ViewerFile | ViewerNull | ViewerRerun | ViewerUSD,
         platform: str = "astro",
-        px4: bool = True,
     ):
         self.platform = platform
         self.viewer = viewer
-        self.px4 = px4
 
         self.fps = 60
         self.frame_dt = 1.0 / self.fps
@@ -269,9 +267,7 @@ class Drone:
         self.sim_substeps = 10
         self.sim_dt = self.frame_dt / self.sim_substeps
 
-        self.mavlink = None
-        if self.px4:
-            self.mavlink = MAVLinkInterface()
+        self.mavlink = MAVLinkInterface()
 
         # Motor configuration for quadrotor (max thrust per motor in Newtons)
         self.max_motor_thrust = 50.0  # Adjust based on drone mass
@@ -462,66 +458,61 @@ class Drone:
 
     def capture(self):
         self.graph = None
-        # Disable CUDA graph capture when using PX4 (dynamic MAVLink I/O is incompatible)
-        if wp.get_device().is_cuda and not self.px4:
-            with wp.ScopedCapture() as capture:
-                self.simulate()
-            self.graph = capture.graph
+        # TODO: make CUDA graph capture work with MAVLink I/O
+        # if wp.get_device().is_cuda:
+        #     with wp.ScopedCapture() as capture:
+        #         self.simulate()
+        #     self.graph = capture.graph
 
     def simulate(self):
-        if self.mavlink:
-            self.mavlink.send_heartbeat()
-            self.mavlink.receive_actuator_controls()
+        self.mavlink.send_heartbeat()
+        self.mavlink.receive_actuator_controls()
 
-            # Convert actuator commands to thrust forces and torques
-            # PX4 sends normalized values [0, 1] for motors
-            total_thrust = 0.0
-            torque_x = 0.0  # Roll
-            torque_y = 0.0  # Pitch
-            torque_z = 0.0  # Yaw
+        # Convert actuator commands to thrust forces and torques
+        # PX4 sends normalized values [0, 1] for motors
+        total_thrust = 0.0
+        torque_x = 0.0  # Roll
+        torque_y = 0.0  # Pitch
+        torque_z = 0.0  # Yaw
 
-            for i in range(4):
-                motor_cmd = max(0.0, min(1.0, self.mavlink.actuator_controls[i]))
-                thrust = motor_cmd * self.max_motor_thrust
-                total_thrust += thrust
+        for i in range(4):
+            motor_cmd = max(0.0, min(1.0, self.mavlink.actuator_controls[i]))
+            thrust = motor_cmd * self.max_motor_thrust
+            total_thrust += thrust
 
-                # Motor position in body frame
-                motor_x = self.motor_arm_length * math.cos(self.motor_angles[i])
-                motor_y = self.motor_arm_length * math.sin(self.motor_angles[i])
+            # Motor position in body frame
+            motor_x = self.motor_arm_length * math.cos(self.motor_angles[i])
+            motor_y = self.motor_arm_length * math.sin(self.motor_angles[i])
 
-                # Torque from thrust at motor position: τ = r × F
-                # F = (0, 0, thrust), r = (motor_x, motor_y, 0)
-                torque_x += motor_y * thrust  # Roll: r_y * F_z
-                torque_y += -motor_x * thrust  # Pitch: -r_x * F_z
+            # Torque from thrust at motor position: τ = r × F
+            # F = (0, 0, thrust), r = (motor_x, motor_y, 0)
+            torque_x += motor_y * thrust  # Roll: r_y * F_z
+            torque_y += -motor_x * thrust  # Pitch: -r_x * F_z
 
-                # Yaw torque from motor reaction (opposite to spin direction)
-                torque_z += -self.motor_spin_dirs[i] * self.motor_torque_coeff * thrust
+            # Yaw torque from motor reaction (opposite to spin direction)
+            torque_z += -self.motor_spin_dirs[i] * self.motor_torque_coeff * thrust
 
-                # Extract body rotation quaternion (XYZW format from body_q transform)
-                body_rot = wp.quat(self.state0.body_q.numpy()[0, 3:7])
+            # Extract body rotation quaternion (XYZW format from body_q transform)
+            body_rot = wp.quat(self.state0.body_q.numpy()[0, 3:7])
 
-                # Forces in body frame [fx, fy, fz, tx, ty, tz]
-                joint_f_b = [0.0, 0.0, total_thrust, torque_x, torque_y, torque_z]
+            # Forces in body frame [fx, fy, fz, tx, ty, tz]
+            joint_f_b = [0.0, 0.0, total_thrust, torque_x, torque_y, torque_z]
 
-                # Rotate linear force from body to world frame
-                force_world = wp.quat_rotate(body_rot, wp.vec3(joint_f_b[:3]))
+            # Rotate linear force from body to world frame
+            force_world = wp.quat_rotate(body_rot, wp.vec3(joint_f_b[:3]))
 
-                # Rotate angular torque from body to world frame
-                torque_world = wp.quat_rotate(body_rot, wp.vec3(joint_f_b[3:]))
+            # Rotate angular torque from body to world frame
+            torque_world = wp.quat_rotate(body_rot, wp.vec3(joint_f_b[3:]))
 
-                # Combine into world-frame joint forces array
-                joint_f_world = [
-                    force_world[0],
-                    force_world[1],
-                    force_world[2],
-                    torque_world[0],
-                    torque_world[1],
-                    torque_world[2],
-                ]
-
-        else:
-            # Default hover thrust when not connected to PX4
-            joint_f_world = [0.0, 0.0, 80.0, 0.0, 0.0, 0.0]
+            # Combine into world-frame joint forces array
+            joint_f_world = [
+                force_world[0],
+                force_world[1],
+                force_world[2],
+                torque_world[0],
+                torque_world[1],
+                torque_world[2],
+            ]
 
         for _ in range(self.sim_substeps):
             self.state0.clear_forces()
@@ -533,14 +524,10 @@ class Drone:
             )
             self.state0, self.state1 = self.state1, self.state0
 
-        # Send sensor data to PX4 if enabled
-        if self.mavlink:
-            self._send_sensor_data()
+        self._send_sensor_data()
 
     def _send_sensor_data(self):
         """Send simulated sensor data to PX4."""
-        if self.mavlink is None:
-            return
         time_usec = int(self.sim_time * 1e6)
 
         # Get current state from simulation
@@ -749,15 +736,9 @@ def main():
         default="astro",
         help="Which drone platform to simulate.",
     )
-    parser.add_argument(
-        "--px4",
-        action="store_true",
-        help="Enable PX4 SITL communication via MAVLink.",
-    )
-
     viewer, args = newton.examples.init(parser)
 
-    drone = Drone(viewer, args.platform, args.px4)
+    drone = Drone(viewer, args.platform)
     newton.examples.run(drone, args)
 
 
