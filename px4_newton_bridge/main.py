@@ -459,6 +459,9 @@ class Drone:
 
         self.capture()
 
+        self.speed_factor = 0
+        self._step_start_time = time.time()
+
     def capture(self):
         """Capture CUDA graph for physics substeps only (no I/O)."""
         self.graph = None
@@ -737,6 +740,15 @@ class Drone:
 
         # simulate() handles I/O and physics (with CUDA graph if available)
         self.simulate()
+
+        if self.speed_factor > 0:
+            step_time = time.time() - self._step_start_time
+            target_step_time = self.frame_dt / self.speed_factor
+            sleep_time = target_step_time - step_time
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+        self._step_start_time = time.time()
 
         # Check if PX4 disconnected and exit if so
 
