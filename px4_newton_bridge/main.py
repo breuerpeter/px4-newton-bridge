@@ -1,3 +1,4 @@
+import argparse
 import math
 import os
 import random
@@ -13,8 +14,7 @@ from pymavlink import mavutil
 from pymavlink.dialects.v20 import common as mavlink2
 
 import newton
-import newton.examples
-from newton.viewer import ViewerFile, ViewerGL, ViewerNull, ViewerRerun, ViewerUSD
+from newton.viewer import ViewerRerun
 
 
 class MAVLinkInterface:
@@ -253,13 +253,8 @@ class MAVLinkInterface:
 
 
 class Drone:
-    def __init__(
-        self,
-        viewer: ViewerGL | ViewerFile | ViewerNull | ViewerRerun | ViewerUSD,
-        platform: str = "astro",
-    ):
+    def __init__(self, platform: str = "astro"):
         self.platform = platform
-        self.viewer = viewer
 
         self.fps = 60
         self.frame_dt = 1.0 / self.fps
@@ -452,8 +447,6 @@ class Drone:
 
         print(f"control dim {self.model.joint_dof_count}")
 
-        self.viewer.set_model(self.model)
-
         self.capture()
 
     def capture(self):
@@ -516,7 +509,6 @@ class Drone:
 
         for _ in range(self.sim_substeps):
             self.state0.clear_forces()
-            self.viewer.apply_forces(self.state0)
             self.control.joint_f.assign(joint_f_world)
             self.contacts = self.model.collide(self.state0)
             self.solver.step(
@@ -722,24 +714,31 @@ class Drone:
             self.frame_count = 0
             self.last_fps_time = now
 
-    def render(self):
-        self.viewer.begin_frame(self.sim_time)
-        self.viewer.log_state(self.state0)
-        self.viewer.end_frame()
-
-
 def main():
-    parser = newton.examples.create_parser()
+    parser = argparse.ArgumentParser(
+        description="PX4 SITL bridge for Newton physics engine",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
     parser.add_argument(
         "--platform",
         type=str,
         default="astro",
         help="Which drone platform to simulate.",
     )
-    viewer, args = newton.examples.init(parser)
+    args = parser.parse_args()
 
-    drone = Drone(viewer, args.platform)
-    newton.examples.run(drone, args)
+    viewer = ViewerRerun()
+    drone = Drone(args.platform)
+    viewer.set_model(drone.model)
+
+    while viewer.is_running():
+        if not viewer.is_paused():
+            drone.step()
+        viewer.begin_frame(drone.sim_time)
+        viewer.log_state(drone.state0)
+        viewer.end_frame()
+
+    viewer.close()
 
 
 if __name__ == "__main__":
