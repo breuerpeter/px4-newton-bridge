@@ -262,11 +262,8 @@ class Drone:
     def __init__(self, platform: str = "astro"):
         self.platform = platform
 
-        self.fps = 60
-        self.frame_dt = 1.0 / self.fps
+        self.sim_dt = 0.004  # [s] (250 Hz, matches Gazebo default)
         self.sim_time = 0.0
-        self.sim_substeps = 10
-        self.sim_dt = self.frame_dt / self.sim_substeps
 
         self.mavlink = MAVLinkInterface()
 
@@ -457,6 +454,9 @@ class Drone:
         # joint_f format: [fx, fy, fz, tx, ty, tz] in world frame
         self._joint_f_buffer = wp.zeros(6, dtype=wp.float32, device=wp.get_device())
 
+        # Buffer to store previous body velocities for acceleration computation
+        self._body_qd_prev = wp.zeros_like(self.state0.body_qd)
+
         self.capture()
 
         self.speed_factor = 0
@@ -474,15 +474,19 @@ class Drone:
             print("[INFO] CUDA graph not available, using standard simulation")
 
     def _simulate_physics(self):
-        """Run physics substeps only - suitable for CUDA graph capture."""
-        for _ in range(self.sim_substeps):
-            self.state0.clear_forces()
-            self.control.joint_f.assign(self._joint_f_buffer)
-            self.contacts = self.model.collide(self.state0)
-            self.solver.step(
-                self.state0, self.state1, self.control, self.contacts, self.sim_dt
-            )
-            self.state0, self.state1 = self.state1, self.state0
+        """Run a single physics step - suitable for CUDA graph capture.
+
+        Steps state0 into state1, then copies state1 back to state0 so the
+        CUDA graph always operates on the same buffers across replays.
+        """
+        self._body_qd_prev.assign(self.state0.body_qd)
+        self.state0.clear_forces()
+        self.control.joint_f.assign(self._joint_f_buffer)
+        self.contacts = self.model.collide(self.state0)
+        self.solver.step(
+            self.state0, self.state1, self.control, self.contacts, self.sim_dt
+        )
+        self.state0.assign(self.state1)
 
     def _compute_forces_from_actuators(self):
         """Convert actuator commands to thrust forces and torques in world frame."""
@@ -568,7 +572,7 @@ class Drone:
         # body_qd contains linear and angular velocity for each body
         body_q = self.state0.body_q.numpy()
         body_qd = self.state0.body_qd.numpy()
-        body_qd_prev = self.state1.body_qd.numpy()
+        body_qd_prev = self._body_qd_prev.numpy()
 
         # Extract drone state (body index 0)
         # Position: [x, y, z]
@@ -736,14 +740,14 @@ class Drone:
 
     def step(self):
         # Increment sim_time BEFORE simulate() so sensor data has non-zero timestamps
-        self.sim_time += self.frame_dt
+        self.sim_time += self.sim_dt
 
         # simulate() handles I/O and physics (with CUDA graph if available)
         self.simulate()
 
         if self.speed_factor > 0:
             step_time = time.time() - self._step_start_time
-            target_step_time = self.frame_dt / self.speed_factor
+            target_step_time = self.sim_dt / self.speed_factor
             sleep_time = target_step_time - step_time
             if sleep_time > 0:
                 time.sleep(sleep_time)
