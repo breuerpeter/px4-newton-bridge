@@ -72,7 +72,7 @@ class MAVLinkInterface:
             )
             self.last_hb_time = now
 
-    def receive_actuator_controls(self, timeout: float = 0.1) -> bool:
+    def receive_actuator_controls(self, timeout: float | None = None) -> bool:
         """
         Receive actuator controls (HIL_ACTUATOR_CONTROLS) message from PX4.
 
@@ -533,6 +533,17 @@ class Drone:
             torque_world[2],
         ]
 
+    def wait_for_px4(self):
+        """Send sensor data until PX4 starts responding with actuator controls."""
+        print("Waiting for PX4 to start lockstep...")
+        while True:
+            self.sim_time += self.sim_dt
+            self.mavlink.send_heartbeat()
+            self._send_sensor_data()
+            if self.mavlink.receive_actuator_controls(timeout=1.0):
+                print("PX4 lockstep established")
+                return
+
     def simulate(self):
         """Full simulation step including MAVLink I/O and physics.
 
@@ -547,9 +558,7 @@ class Drone:
         self._send_sensor_data()
 
         # Block waiting for actuator controls (lockstep synchronization)
-        if not self.mavlink.receive_actuator_controls(timeout=0.5):
-            # Timeout - PX4 may be slow or disconnected, continue with previous controls
-            pass
+        self.mavlink.receive_actuator_controls(timeout=None)
 
         # Compute forces from actuator commands (CPU, before graph launch)
         joint_f_world = self._compute_forces_from_actuators()
@@ -766,6 +775,7 @@ class Drone:
             self.frame_count = 0
             self.last_fps_time = now
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="PX4 SITL bridge for Newton physics engine",
@@ -782,6 +792,8 @@ def main():
     viewer = ViewerRerun()
     drone = Drone(args.platform)
     viewer.set_model(drone.model)
+
+    drone.wait_for_px4()
 
     while viewer.is_running():
         if not viewer.is_paused():
