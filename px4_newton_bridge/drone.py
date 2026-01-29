@@ -6,6 +6,7 @@ import time
 import newton
 import warp as wp
 
+from .logging import logger
 from .mavlink_interface import MAVLinkInterface
 
 
@@ -187,10 +188,10 @@ class Drone:
 
         self.model = builder.finalize()
 
-        print(f"body_q={self.model.body_q}")
-        print(f"body_qd={self.model.body_qd}")
-        print(f"joint_q={self.model.joint_q}")
-        print(f"joint_qd={self.model.joint_qd}")
+        logger.debug(f"body_q={self.model.body_q}")
+        logger.debug(f"body_qd={self.model.body_qd}")
+        logger.debug(f"joint_q={self.model.joint_q}")
+        logger.debug(f"joint_qd={self.model.joint_qd}")
 
         self.solver = newton.solvers.SolverMuJoCo(self.model, njmax=224)
 
@@ -199,7 +200,7 @@ class Drone:
         self.control = self.model.control()
         self.contacts = self.model.collide(self.state0)
 
-        print(f"control dim {self.model.joint_dof_count}")
+        logger.debug(f"control dim {self.model.joint_dof_count}")
 
         # Pre-allocate Warp array for joint forces (used by CUDA graph)
         # joint_f format: [fx, fy, fz, tx, ty, tz] in world frame
@@ -211,19 +212,19 @@ class Drone:
         self.capture()
 
         self.speed_factor = float(os.environ.get("PX4_REAL_TIME_FACTOR", 0))
-        print(f"Real time factor: {self.speed_factor}")
+        logger.info(f"Real time factor: {self.speed_factor}")
         self._step_start_time = time.time()
 
     def capture(self):
         """Capture CUDA graph for physics substeps only (no I/O)."""
         self.graph = None
         if wp.get_device().is_cuda and wp.is_mempool_enabled(wp.get_device()):
-            print("[INFO] Using CUDA graph for physics simulation")
+            logger.info("Using CUDA graph for physics simulation")
             with wp.ScopedCapture() as capture:
                 self._simulate_physics()
             self.graph = capture.graph
         else:
-            print("[INFO] CUDA graph not available, using standard simulation")
+            logger.info("CUDA graph not available, using standard simulation")
 
     def _simulate_physics(self):
         """Run a single physics step - suitable for CUDA graph capture.
@@ -287,13 +288,13 @@ class Drone:
 
     def wait_for_px4(self):
         """Send sensor data until PX4 starts responding with actuator controls."""
-        print("Waiting for PX4 to start lockstep...")
+        logger.info("Waiting for PX4 to start lockstep...")
         while True:
             self.sim_time += self.sim_dt
             self.mavlink.send_heartbeat()
             self._send_sensor_data()
             if self.mavlink.receive_actuator_controls(timeout=1.0):
-                print("PX4 lockstep established")
+                logger.info("PX4 lockstep established")
                 return
 
     def simulate(self):

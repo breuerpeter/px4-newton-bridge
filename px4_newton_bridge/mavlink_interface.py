@@ -9,6 +9,8 @@ os.environ["MAVLINK_DIALECT"] = "common"
 from pymavlink import mavutil
 from pymavlink.dialects.v20 import common as mavlink2
 
+from .logging import logger
+
 
 class MAVLinkInterface:
     """Handles MAVLink communication with a PX4 SITL instance."""
@@ -20,7 +22,7 @@ class MAVLinkInterface:
 
     def __init__(self, ip: str = "0.0.0.0", sysid: int = 1, compid: int = 200):
         conn_string = f"tcpin:{ip}:4560"
-        print(f"Waiting for PX4 connection on {conn_string}...")
+        logger.info(f"Waiting for PX4 connection on {conn_string}...")
         self.mav = cast(
             mavutil.mavtcpin,
             mavutil.mavlink_connection(
@@ -35,7 +37,7 @@ class MAVLinkInterface:
         self.mav.target_system = 1
         self.mav.target_component = mavutil.mavlink.MAV_COMP_ID_AUTOPILOT1
 
-        print(
+        logger.info(
             f"Using MAVLink source sysid/compid {self.proto.srcSystem}/{self.proto.srcComponent} "
             f"and target sysid/compid {self.mav.target_system}/{self.mav.target_component}"
         )
