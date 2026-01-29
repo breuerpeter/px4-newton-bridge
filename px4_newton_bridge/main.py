@@ -1,8 +1,7 @@
 import argparse
 
-from newton.viewer import ViewerRerun
-
 from .drone import Drone
+from .viewer import Viewer
 
 
 def main():
@@ -18,8 +17,8 @@ def main():
     )
     args = parser.parse_args()
 
-    viewer = ViewerRerun()
     drone = Drone(args.platform)
+    viewer = Viewer(sim_dt=drone.sim_dt)
     viewer.set_model(drone.model)
 
     drone.wait_for_px4()

@@ -27,10 +27,7 @@ class Drone:
         # Standard X-quad: alternating spin directions
         self.motor_spin_dirs = [1, -1, 1, -1]
 
-        # FPS tracking
-        self.fps_update_interval = 0.5  # Update FPS display every 0.5 seconds
-        self.last_fps_time = time.time()
-        self.frame_count = 0
+
 
         # Drone body (rigid, symmetric in xz and xy plane)
         self.carbon_fiber_density = 1750  # [kg/m^3]
@@ -515,15 +512,3 @@ class Drone:
                 time.sleep(sleep_time)
 
         self._step_start_time = time.time()
-
-        # Check if PX4 disconnected and exit if so
-
-        # FPS tracking
-        self.frame_count += 1
-        now = time.time()
-        elapsed = now - self.last_fps_time
-        if elapsed >= self.fps_update_interval:
-            fps = self.frame_count / elapsed
-            print(f"\rFPS: {fps:.1f}  ", end="", flush=True)
-            self.frame_count = 0
-            self.last_fps_time = now
