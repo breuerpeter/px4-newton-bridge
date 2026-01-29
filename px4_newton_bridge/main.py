@@ -459,7 +459,8 @@ class Drone:
 
         self.capture()
 
-        self.speed_factor = 0
+        self.speed_factor = float(os.environ.get("PX4_REAL_TIME_FACTOR", 0))
+        print(f"Real time factor: {self.speed_factor}")
         self._step_start_time = time.time()
 
     def capture(self):
