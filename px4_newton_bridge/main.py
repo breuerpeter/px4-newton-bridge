@@ -1,6 +1,7 @@
 import argparse
 
-from .drone import Drone
+from .models import load_model
+from .vehicle import Vehicle
 from .viewer import Viewer
 
 
@@ -10,24 +11,25 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--platform",
+        "--model",
         type=str,
-        default="astro",
-        help="Which drone platform to simulate.",
+        default="default",
+        help="Vehicle model config to simulate (name of YAML file in models/configs/).",
     )
     args = parser.parse_args()
 
-    drone = Drone(args.platform)
-    viewer = Viewer(sim_dt=drone.sim_dt)
-    viewer.set_model(drone.model)
+    vehicle_model = load_model(args.model)
+    vehicle = Vehicle(vehicle_model)
+    viewer = Viewer(sim_dt=vehicle.sim_dt)
+    viewer.set_model(vehicle.model)
 
-    drone.wait_for_px4()
+    vehicle.wait_for_px4()
 
     while viewer.is_running():
         if not viewer.is_paused():
-            drone.step()
-        viewer.begin_frame(drone.sim_time)
-        viewer.log_state(drone.state0)
+            vehicle.step()
+        viewer.begin_frame(vehicle.sim_time)
+        viewer.log_state(vehicle.state0)
         viewer.end_frame()
 
     viewer.close()

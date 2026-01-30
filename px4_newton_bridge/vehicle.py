@@ -8,58 +8,17 @@ import warp as wp
 
 from .logging import logger
 from .mavlink_interface import MAVLinkInterface
+from .models.base_model import VehicleModel
 
 
-class Drone:
-    def __init__(self, platform: str = "astro"):
-        self.platform = platform
+class Vehicle:
+    def __init__(self, vehicle_model: VehicleModel):
+        self.vehicle_model = vehicle_model
 
         self.sim_dt = 0.004  # [s] (250 Hz, matches Gazebo default)
         self.sim_time = 0.0
 
         self.mavlink = MAVLinkInterface()
-
-        # Motor configuration for quadrotor (max thrust per motor in Newtons)
-        self.max_motor_thrust = 50.0  # Adjust based on drone mass
-        # Torque coefficient: ratio of reaction torque to thrust (N·m per N)
-        self.motor_torque_coeff = 0.05
-        # Motor spin directions for yaw torque (1 = CCW, -1 = CW when viewed from above)
-        # Standard X-quad: alternating spin directions
-        self.motor_spin_dirs = [1, -1, 1, -1]
-
-
-
-        # Drone body (rigid, symmetric in xz and xy plane)
-        self.carbon_fiber_density = 1750  # [kg/m^3]
-
-        # Astro (default)
-        self.body_density = 800  # [kg/m^3]
-        # Half lengths
-        self.body_hx_m = 0.125
-        self.body_hy_m = self.body_hx_m
-        self.body_hz_m = 0.05
-
-        self.body_boom_diam_m = 0.05
-        self.body_boom_len_m = 0.20
-
-        self.motor_diam_m = 0.08
-        self.motor_height_m = 0.05
-
-        self.lnd_gear_angle_rad = wp.pi / 6
-        self.lnd_gear_length_m = 0.2
-        self.lnd_gear_diam_m = 0.02
-
-        # Alta X Gen2
-        if self.platform == "altaxgen2":
-            self.body_hx_m *= 2
-            self.body_hy_m *= 2
-            self.body_hz_m *= 2
-
-            self.body_boom_diam_m *= 2
-            self.body_boom_len_m *= 2
-
-            self.motor_diam_m *= 2
-            self.motor_height_m *= 2
 
         builder = newton.ModelBuilder()
         builder.default_shape_cfg.ke = 1e4  # Contact stiffness
@@ -72,115 +31,10 @@ class Drone:
         init_tf_body = wp.transform(init_pos_body, init_att_body)
 
         body = builder.add_body(xform=init_tf_body)
-        builder.add_shape_box(
-            body,
-            hx=self.body_hx_m,
-            hy=self.body_hy_m,
-            hz=self.body_hz_m,
-            cfg=newton.ModelBuilder.ShapeConfig(density=self.body_density),
-            key="fuselage",
-        )
 
-        boom_rot_y = wp.quat_from_axis_angle(
-            wp.vec3(0, 1, 0), wp.half_pi
-        )  # rotate cylinder to point along x
+        # Delegate shape building to the vehicle model
+        self.vehicle_model.build(builder, body)
 
-        boom_half_length = self.body_boom_len_m / 2
-        body_diagonal_xy = math.sqrt(self.body_hx_m**2 + self.body_hy_m**2)
-        boom_radius = self.body_boom_diam_m / 2
-        diagonal_boom = body_diagonal_xy + boom_half_length - boom_radius
-        diagonal_motor = diagonal_boom + boom_half_length
-
-        # Store motor geometry for torque calculations
-        self.motor_arm_length = diagonal_motor
-        self.motor_angles = [-(2 * i + 1) * math.pi / 4 for i in range(4)]
-
-        lnd_gear_rot_y = wp.quat_from_axis_angle(
-            wp.vec3(0, 1, 0), -self.lnd_gear_angle_rad
-        )
-
-        for id in range(4):
-            # add booms
-            boom_angle = (2 * id + 1) * wp.pi / 4
-            boom_rot_z = wp.quat_from_axis_angle(wp.vec3(0, 0, 1), boom_angle)
-            boom_rot = (
-                boom_rot_z * boom_rot_y
-            )  # rotate around world y-axis first, then world z-axis
-
-            boom_shift = wp.vec3(
-                diagonal_boom * math.cos(boom_angle),
-                diagonal_boom * math.sin(boom_angle),
-                0.0,
-            )
-
-            builder.add_shape_cylinder(
-                body,
-                xform=wp.transform(
-                    boom_shift,
-                    boom_rot,
-                ),
-                radius=boom_radius,
-                half_height=boom_half_length,
-                cfg=newton.ModelBuilder.ShapeConfig(density=self.carbon_fiber_density),
-            )
-
-            # add motors
-            motor_shift = wp.vec3(
-                diagonal_motor * math.cos(boom_angle),
-                diagonal_motor * math.sin(boom_angle),
-                0.0,
-            )
-
-            builder.add_shape_cylinder(
-                body,
-                xform=wp.transform(motor_shift, wp.quat_identity()),
-                radius=self.motor_diam_m / 2,
-                half_height=self.motor_height_m / 2,
-                cfg=newton.ModelBuilder.ShapeConfig(density=1000),
-            )
-
-            # add landing gear
-            lnd_gear_rot = (
-                boom_rot_z * lnd_gear_rot_y
-            )  # rotate around world y-axis first, then world z-axis
-
-            top_local = wp.vec3(0.0, 0.0, self.lnd_gear_length_m / 2)
-            top_offset = wp.quat_rotate(lnd_gear_rot, top_local)
-
-            attachment_point = wp.vec3(
-                body_diagonal_xy * math.cos(boom_angle),
-                body_diagonal_xy * math.sin(boom_angle),
-                -self.body_hz_m,
-            )
-
-            lnd_gear_shift = attachment_point - top_offset
-
-            builder.add_shape_cylinder(
-                body,
-                xform=wp.transform(lnd_gear_shift, lnd_gear_rot),
-                radius=self.lnd_gear_diam_m / 2,
-                half_height=self.lnd_gear_length_m / 2,
-                cfg=newton.ModelBuilder.ShapeConfig(density=self.carbon_fiber_density),
-            )
-
-            # add GPS antenna
-            # TODO: change to site
-
-            gps_ant_radius_m = 0.02
-            gps_ant_half_height_m = 0.05
-            gps_antenna_shift = wp.vec3(
-                self.body_hx_m - gps_ant_radius_m,
-                0.0,
-                self.body_hz_m + gps_ant_half_height_m,
-            )
-
-            builder.add_shape_cylinder(
-                body,
-                xform=wp.transform(gps_antenna_shift, wp.quat_identity()),
-                radius=gps_ant_radius_m,
-                half_height=gps_ant_half_height_m,
-                cfg=newton.ModelBuilder.ShapeConfig(density=0.0),
-            )
         builder.add_ground_plane()
 
         self.model = builder.finalize()
@@ -238,50 +92,12 @@ class Drone:
         )
         self.state0.assign(self.state1)
 
-    def _compute_forces_from_actuators(self):
-        """Convert actuator commands to thrust forces and torques in world frame."""
-        total_thrust = 0.0
-        torque_x = 0.0  # Roll
-        torque_y = 0.0  # Pitch
-        torque_z = 0.0  # Yaw
-
-        for i in range(4):
-            motor_cmd = max(0.0, min(1.0, self.mavlink.actuator_controls[i]))
-            thrust = motor_cmd * self.max_motor_thrust
-            total_thrust += thrust
-
-            # Motor position in body frame
-            motor_x = self.motor_arm_length * math.cos(self.motor_angles[i])
-            motor_y = self.motor_arm_length * math.sin(self.motor_angles[i])
-
-            # Torque from thrust at motor position: τ = r × F
-            # F = (0, 0, thrust), r = (motor_x, motor_y, 0)
-            torque_x += motor_y * thrust  # Roll: r_y * F_z
-            torque_y += -motor_x * thrust  # Pitch: -r_x * F_z
-
-            # Yaw torque from motor reaction (opposite to spin direction)
-            torque_z += -self.motor_spin_dirs[i] * self.motor_torque_coeff * thrust
-
-        # Extract body rotation quaternion (XYZW format from body_q transform)
+    def _compute_wrench_from_actuators(self):
+        """Convert actuator commands to wrench (forces + torques) in world frame."""
         body_rot = wp.quat(self.state0.body_q.numpy()[0, 3:7])
-
-        # Forces in body frame [fx, fy, fz, tx, ty, tz]
-        joint_f_b = [0.0, 0.0, total_thrust, torque_x, torque_y, torque_z]
-
-        # Rotate linear force from body to world frame
-        force_world = wp.quat_rotate(body_rot, wp.vec3(joint_f_b[:3]))
-
-        # Rotate angular torque from body to world frame
-        torque_world = wp.quat_rotate(body_rot, wp.vec3(joint_f_b[3:]))
-
-        return [
-            force_world[0],
-            force_world[1],
-            force_world[2],
-            torque_world[0],
-            torque_world[1],
-            torque_world[2],
-        ]
+        return self.vehicle_model.compute_wrench(
+            self.mavlink.actuator_controls, body_rot
+        )
 
     def wait_for_px4(self):
         """Send sensor data until PX4 starts responding with actuator controls."""
@@ -310,8 +126,8 @@ class Drone:
         # Block waiting for actuator controls (lockstep synchronization)
         self.mavlink.receive_actuator_controls(timeout=None)
 
-        # Compute forces from actuator commands (CPU, before graph launch)
-        joint_f_world = self._compute_forces_from_actuators()
+        # Compute wrench from actuator commands (CPU, before graph launch)
+        joint_f_world = self._compute_wrench_from_actuators()
 
         # Update the force buffer used by physics simulation
         self._joint_f_buffer.assign(joint_f_world)
@@ -333,7 +149,7 @@ class Drone:
         body_qd = self.state0.body_qd.numpy()
         body_qd_prev = self._body_qd_prev.numpy()
 
-        # Extract drone state (body index 0)
+        # Extract vehicle state (body index 0)
         # Position: [x, y, z]
         pos = body_q[0, :3]
         # Quaternion: [x, y, z, w] (warp convention)
@@ -348,9 +164,6 @@ class Drone:
 
         # Acceleration: [x, y, z]
         acc_linear = (vel_linear - vel_linear_prev) / self.sim_dt
-
-        # Generic/placeholder sensor data
-        # In a real implementation, these would be computed from simulation state
 
         # IMU data (accelerometer measures specific force in body frame)
         # Specific force = linear_acceleration - gravity (both in body frame)
