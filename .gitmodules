@@ -2,6 +2,6 @@
 	path = newton
 	url = git@github.com:breuerpeter/newton.git
 	branch = px4
-[submodule "px4_newton_bridge/vehicles/urdf/astro_max"]
-	path = px4_newton_bridge/vehicles/urdf/astro_max
+[submodule "px4_newton_bridge/vehicles/astro_max/urdf"]
+	path = px4_newton_bridge/vehicles/astro_max/urdf
 	url = git@github.com:freefly-systems/astro_max_urdf.git

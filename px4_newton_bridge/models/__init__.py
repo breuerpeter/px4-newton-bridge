@@ -14,9 +14,9 @@ _CONFIGS_DIR = pathlib.Path(__file__).parent.parent / "vehicles"
 
 def load_model(name: str) -> VehicleModel:
     """Load a vehicle model by config name (e.g. 'quad_x')."""
-    cfg_path = _CONFIGS_DIR / f"{name}.yaml"
+    cfg_path = _CONFIGS_DIR / name / "model.yaml"
     if not cfg_path.exists():
-        available = [p.stem for p in _CONFIGS_DIR.glob("*.yaml")]
+        available = [p.name for p in _CONFIGS_DIR.iterdir() if p.is_dir() and (p / "model.yaml").exists()]
         raise FileNotFoundError(
             f"Vehicle config '{name}' not found. Available: {available}"
         )
