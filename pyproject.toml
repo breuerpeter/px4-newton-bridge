@@ -45,4 +45,4 @@ index = "mujoco"
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
-extraPaths = [".venv/lib/python3.11/site-packages/rerun_sdk"]
+extraPaths = ["./newton", ".venv/lib/python3.11/site-packages/rerun_sdk"]
