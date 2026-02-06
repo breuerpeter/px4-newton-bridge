@@ -3,17 +3,19 @@ import math
 import newton
 import warp as wp
 
-from .base_model import VehicleModel
+from .builder_base import BuilderBase
 
 
-class QuadrotorModel(VehicleModel):
-    """Quadrotor vehicle model built from YAML config parameters."""
+class QuadXPrimitive(BuilderBase):
+    """Single-body quadrotor X configuration model built from geometric primitives."""
 
     def __init__(self, cfg: dict):
-        body = cfg["body"]
-        boom = cfg["boom"]
-        motor = cfg["motor"]
-        landing_gear = cfg["landing_gear"]
+        super().__init__(cfg)
+
+        body = self.cfg["body"]
+        boom = self.cfg["boom"]
+        motor = self.cfg["motor"]
+        landing_gear = self.cfg["landing_gear"]
 
         self.body_density = body["density"]
         self.body_hx = body["hx"]
@@ -133,38 +135,3 @@ class QuadrotorModel(VehicleModel):
             half_height=gps_ant_half_height,
             cfg=newton.ModelBuilder.ShapeConfig(density=0.0),
         )
-
-    def compute_control_wrench(
-        self, actuator_controls: list[float], body_q
-    ) -> list[float]:
-
-        body_rot = wp.quatf(body_q[0, 3:7])
-
-        total_thrust = 0.0
-        torque_x = 0.0
-        torque_y = 0.0
-        torque_z = 0.0
-
-        for i in range(4):
-            motor_cmd = max(0.0, min(1.0, actuator_controls[i]))
-            thrust = motor_cmd * self.max_motor_thrust
-            total_thrust += thrust
-
-            motor_x = self.motor_arm_length * math.cos(self.motor_angles[i])
-            motor_y = self.motor_arm_length * math.sin(self.motor_angles[i])
-
-            torque_x += motor_y * thrust
-            torque_y += -motor_x * thrust
-            torque_z += -self.motor_spin_dirs[i] * self.motor_torque_coeff * thrust
-
-        force_world = wp.quat_rotate(body_rot, wp.vec3(0.0, 0.0, total_thrust))
-        torque_world = wp.quat_rotate(body_rot, wp.vec3(torque_x, torque_y, torque_z))
-
-        return [
-            force_world[0],
-            force_world[1],
-            force_world[2],
-            torque_world[0],
-            torque_world[1],
-            torque_world[2],
-        ]

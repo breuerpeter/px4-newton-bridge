@@ -1,6 +1,6 @@
 import argparse
 
-from .models import load_model
+from . import load_model
 from .simulator import Simulator
 from .viewer import Viewer
 
@@ -18,8 +18,7 @@ def main():
     )
     args = parser.parse_args()
 
-    vehicle_model = load_model(args.vehicle)
-    sim = Simulator(vehicle_model)
+    sim = Simulator(*load_model(args.vehicle))
     viewer = Viewer(sim_dt=sim.sim_dt)
     viewer.set_model(sim.model)
 

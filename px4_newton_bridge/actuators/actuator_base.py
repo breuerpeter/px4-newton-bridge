@@ -1,14 +1,9 @@
 from abc import ABC, abstractmethod
 
-import newton
 
-
-class VehicleModel(ABC):
-    """Interface that all Newton vehicle models must implement."""
-
-    @abstractmethod
-    def build(self, builder: newton.ModelBuilder, body: int) -> None:
-        """Build the model using Newton's model builder."""
+class ActuatorBase(ABC):
+    def __init__(self, cfg):
+        self.cfg = cfg
 
     @abstractmethod
     def compute_control_wrench(

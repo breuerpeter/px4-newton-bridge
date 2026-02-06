@@ -6,14 +6,16 @@ import time
 import newton
 import warp as wp
 
+from .actuators import ActuatorBase
+from .builders import BuilderBase
 from .logging import logger
 from .mavlink_interface import MAVLinkInterface
-from .models.base_model import VehicleModel
 
 
 class Simulator:
-    def __init__(self, vehicle_model: VehicleModel):
-        self.vehicle_model = vehicle_model
+    def __init__(self, vehicle_builder: BuilderBase, vehicle_actuator: ActuatorBase):
+        self.vehicle_builder = vehicle_builder
+        self.vehicle_actuator = vehicle_actuator
 
         self.sim_dt = 0.004  # [s] (250 Hz, matches Gazebo default)
         self.sim_time = 0.0
@@ -28,8 +30,7 @@ class Simulator:
 
         body = builder.add_body(xform=init_tf_body)
 
-        # Delegate shape building to the vehicle model
-        self.vehicle_model.build(builder, body)
+        self.vehicle_builder.build(builder, body)
 
         builder.add_ground_plane()
 
@@ -116,7 +117,7 @@ class Simulator:
         self.mavlink.receive_actuator_controls(timeout=None)
 
         # Compute wrench from actuator commands (CPU, before graph launch)
-        joint_f_world = self.vehicle_model.compute_control_wrench(
+        joint_f_world = self.vehicle_actuator.compute_control_wrench(
             self.mavlink.actuator_controls, self.state0.body_q.numpy()
         )
 
