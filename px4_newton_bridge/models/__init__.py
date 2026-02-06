@@ -9,7 +9,7 @@ _MODEL_TYPES: dict[str, type[VehicleModel]] = {
     "quadrotor": QuadrotorModel,
 }
 
-_CONFIGS_DIR = pathlib.Path(__file__).parent / "configs"
+_CONFIGS_DIR = pathlib.Path(__file__).parent.parent / "vehicles"
 
 
 def load_model(name: str) -> VehicleModel:
@@ -18,7 +18,7 @@ def load_model(name: str) -> VehicleModel:
     if not cfg_path.exists():
         available = [p.stem for p in _CONFIGS_DIR.glob("*.yaml")]
         raise FileNotFoundError(
-            f"Model config '{name}' not found. Available: {available}"
+            f"Vehicle config '{name}' not found. Available: {available}"
         )
 
     with open(cfg_path) as f:

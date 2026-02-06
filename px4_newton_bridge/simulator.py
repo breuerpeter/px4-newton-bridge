@@ -11,7 +11,7 @@ from .mavlink_interface import MAVLinkInterface
 from .models.base_model import VehicleModel
 
 
-class Vehicle:
+class Simulator:
     def __init__(self, vehicle_model: VehicleModel):
         self.vehicle_model = vehicle_model
 

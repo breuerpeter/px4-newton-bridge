@@ -1,7 +1,7 @@
 import argparse
 
 from .models import load_model
-from .vehicle import Vehicle
+from .simulator import Simulator
 from .viewer import Viewer
 
 
@@ -11,25 +11,25 @@ def main():
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        "--model",
+        "--vehicle",
         type=str,
-        default="default",
-        help="Vehicle model config to simulate (name of YAML file in models/configs/).",
+        default="quad_x",
+        help="Vehicle to simulate (name of YAML file in vehicles/).",
     )
     args = parser.parse_args()
 
-    vehicle_model = load_model(args.model)
-    vehicle = Vehicle(vehicle_model)
-    viewer = Viewer(sim_dt=vehicle.sim_dt)
-    viewer.set_model(vehicle.model)
+    vehicle_model = load_model(args.vehicle)
+    sim = Simulator(vehicle_model)
+    viewer = Viewer(sim_dt=sim.sim_dt)
+    viewer.set_model(sim.model)
 
-    vehicle.wait_for_px4()
+    sim.wait_for_px4()
 
     while viewer.is_running():
         if not viewer.is_paused():
-            vehicle.step()
-        viewer.begin_frame(vehicle.sim_time)
-        viewer.log_state(vehicle.state0)
+            sim.step()
+        viewer.begin_frame(sim.sim_time)
+        viewer.log_state(sim.state0)
         viewer.end_frame()
 
     viewer.close()
