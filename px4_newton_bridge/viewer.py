@@ -1,5 +1,3 @@
-"""Custom Rerun viewer with PX4 bridge blueprint (3D + status + logs)."""
-
 import time
 
 import rerun as rr
@@ -49,9 +47,12 @@ class Viewer(ViewerRerun):
         if elapsed >= self._fps_interval:
             sps = self._frame_count / elapsed
             rtf = sps * self._sim_dt
-            rr.log("status", rr.TextDocument(
-                f"**Real time factor:** {rtf:.2f}",
-                media_type=rr.MediaType.MARKDOWN,
-            ))
+            rr.log(
+                "status",
+                rr.TextDocument(
+                    f"**Real time factor:** {rtf:.2f}",
+                    media_type=rr.MediaType.MARKDOWN,
+                ),
+            )
             self._frame_count = 0
             self._last_fps_time = now
