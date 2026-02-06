@@ -19,8 +19,3 @@ class VehicleModel(ABC):
 
         Returns [fx, fy, fz, tx, ty, tz] in world frame.
         """
-
-    @property
-    @abstractmethod
-    def motor_count(self) -> int:
-        """Number of motors / actuator channels used by this model."""

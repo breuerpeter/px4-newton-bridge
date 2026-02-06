@@ -46,10 +46,6 @@ class QuadrotorModel(VehicleModel):
         self.motor_arm_length = self.diagonal_motor
         self.motor_angles = [-(2 * i + 1) * math.pi / 4 for i in range(4)]
 
-    @property
-    def motor_count(self) -> int:
-        return 4
-
     def build(self, builder: newton.ModelBuilder, body: int) -> None:
         boom_rot_y = wp.quat_from_axis_angle(wp.vec3(0, 1, 0), wp.half_pi)
 
