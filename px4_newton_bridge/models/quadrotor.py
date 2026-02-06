@@ -87,9 +87,7 @@ class QuadrotorModel(VehicleModel):
                 xform=wp.transform(boom_shift, boom_rot),
                 radius=boom_radius,
                 half_height=boom_half_length,
-                cfg=newton.ModelBuilder.ShapeConfig(
-                    density=self.carbon_fiber_density
-                ),
+                cfg=newton.ModelBuilder.ShapeConfig(density=self.carbon_fiber_density),
             )
 
             # Motor
@@ -121,9 +119,7 @@ class QuadrotorModel(VehicleModel):
                 xform=wp.transform(lnd_gear_shift, lnd_gear_rot),
                 radius=self.lnd_gear_diam / 2,
                 half_height=self.lnd_gear_length / 2,
-                cfg=newton.ModelBuilder.ShapeConfig(
-                    density=self.carbon_fiber_density
-                ),
+                cfg=newton.ModelBuilder.ShapeConfig(density=self.carbon_fiber_density),
             )
 
         # GPS antenna
@@ -160,16 +156,10 @@ class QuadrotorModel(VehicleModel):
 
             torque_x += motor_y * thrust
             torque_y += -motor_x * thrust
-            torque_z += (
-                -self.motor_spin_dirs[i] * self.motor_torque_coeff * thrust
-            )
+            torque_z += -self.motor_spin_dirs[i] * self.motor_torque_coeff * thrust
 
-        force_world = wp.quat_rotate(
-            body_rot, wp.vec3(0.0, 0.0, total_thrust)
-        )
-        torque_world = wp.quat_rotate(
-            body_rot, wp.vec3(torque_x, torque_y, torque_z)
-        )
+        force_world = wp.quat_rotate(body_rot, wp.vec3(0.0, 0.0, total_thrust))
+        torque_world = wp.quat_rotate(body_rot, wp.vec3(torque_x, torque_y, torque_z))
 
         return [
             force_world[0],

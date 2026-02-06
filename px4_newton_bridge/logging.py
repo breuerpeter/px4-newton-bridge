@@ -1,5 +1,3 @@
-"""Logging configuration that routes all output through Rerun's TextLog."""
-
 import logging
 
 import rerun as rr
