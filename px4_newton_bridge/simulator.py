@@ -88,13 +88,6 @@ class Simulator:
         )
         self.state0.assign(self.state1)
 
-    def _compute_wrench_from_actuators(self):
-        """Convert actuator commands to wrench (forces + torques) in world frame."""
-        body_rot = wp.quat(self.state0.body_q.numpy()[0, 3:7])
-        return self.vehicle_model.compute_wrench(
-            self.mavlink.actuator_controls, body_rot
-        )
-
     def wait_for_px4(self):
         """Send sensor data until PX4 starts responding with actuator controls."""
         logger.info("Waiting for PX4 to start lockstep...")
@@ -116,14 +109,16 @@ class Simulator:
         """
         self.mavlink.send_heartbeat()
 
-        # Send sensor data first - this triggers PX4 to compute actuator controls
+        # Step PX4
         self._send_sensor_data()
 
         # Block waiting for actuator controls (lockstep synchronization)
         self.mavlink.receive_actuator_controls(timeout=None)
 
         # Compute wrench from actuator commands (CPU, before graph launch)
-        joint_f_world = self._compute_wrench_from_actuators()
+        joint_f_world = self.vehicle_model.compute_control_wrench(
+            self.mavlink.actuator_controls, self.state0.body_q.numpy()
+        )
 
         # Update the force buffer used by physics simulation
         self._joint_f_buffer.assign(joint_f_world)

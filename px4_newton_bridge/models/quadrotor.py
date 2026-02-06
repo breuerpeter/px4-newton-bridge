@@ -134,9 +134,12 @@ class QuadrotorModel(VehicleModel):
             cfg=newton.ModelBuilder.ShapeConfig(density=0.0),
         )
 
-    def compute_wrench(
-        self, actuator_controls: list[float], body_rot: wp.quat
+    def compute_control_wrench(
+        self, actuator_controls: list[float], body_q
     ) -> list[float]:
+
+        body_rot = wp.quatf(body_q[0, 3:7])
+
         total_thrust = 0.0
         torque_x = 0.0
         torque_y = 0.0
