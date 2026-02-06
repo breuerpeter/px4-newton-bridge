@@ -7,9 +7,11 @@ from .actuators.actuator_base import ActuatorBase
 from .actuators.propeller_basic import PropellerBasic
 from .builders.builder_base import BuilderBase
 from .builders.quad_x_primitive import QuadXPrimitive
+from .builders.urdf import URDFBuilder
 
 _BUILDER_TYPES: dict[str, type[BuilderBase]] = {
     "quad_x_primitive": QuadXPrimitive,
+    "urdf": URDFBuilder,
 }
 
 _ACTUATOR_TYPES: dict[str, type[ActuatorBase]] = {
@@ -47,4 +49,5 @@ def load_model(name: str) -> tuple[BuilderBase, ActuatorBase]:
             f"Unknown actuator type '{actuator_type}'. Registered: {list(_ACTUATOR_TYPES)}"
         )
 
-    return _BUILDER_TYPES[builder_type](cfg), _ACTUATOR_TYPES[actuator_type](cfg)
+    vehicle_dir = cfg_path.parent
+    return _BUILDER_TYPES[builder_type](cfg, vehicle_dir), _ACTUATOR_TYPES[actuator_type](cfg)

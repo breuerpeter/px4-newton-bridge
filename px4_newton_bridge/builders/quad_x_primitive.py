@@ -9,8 +9,8 @@ from .builder_base import BuilderBase
 class QuadXPrimitive(BuilderBase):
     """Single-body quadrotor X configuration model built from geometric primitives."""
 
-    def __init__(self, cfg: dict):
-        super().__init__(cfg)
+    def __init__(self, cfg, vehicle_dir):
+        super().__init__(cfg, vehicle_dir)
 
         body = self.cfg["body"]
         boom = self.cfg["boom"]

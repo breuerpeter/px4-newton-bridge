@@ -1,1 +1,7 @@
-type: quadrotor
+builder: urdf
+actuator: propeller_basic
+
+motor:
+  max_thrust: 50.0    # per motor [N]
+  torque_coeff: 0.05  # N·m per N reaction torque
+  spin_dirs: [1, -1, 1, -1]  # CCW=1, CW=-1 (viewed from above)
