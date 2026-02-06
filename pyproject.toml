@@ -41,3 +41,6 @@ index = "nvidia"
 
 [tool.uv.sources.mujoco]
 index = "mujoco"
+
+[tool.pyright]
+extraPaths = [".venv/lib/python3.11/site-packages/rerun_sdk"]
