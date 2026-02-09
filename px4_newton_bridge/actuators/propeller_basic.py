@@ -10,41 +10,18 @@ class PropellerBasic(ActuatorBase):
     def __init__(self, cfg: dict):
         super().__init__(cfg)
 
-        body = self.cfg["body"]
-        boom = self.cfg["boom"]
-        motor = self.cfg["motor"]
-        landing_gear = self.cfg["landing_gear"]
-
-        self.body_density = body["density"]
-        self.body_hx = body["hx"]
-        self.body_hy = body["hy"]
-        self.body_hz = body["hz"]
-
-        self.boom_diam = boom["diameter"]
-        self.boom_len = boom["length"]
-
-        self.motor_diam = motor["diameter"]
-        self.motor_height = motor["height"]
-        self.max_motor_thrust = motor["max_thrust"]
-        self.motor_torque_coeff = motor["torque_coeff"]
-        self.motor_spin_dirs = motor["spin_dirs"]
-
-        self.lnd_gear_angle_rad = landing_gear["angle_rad"]
-        self.lnd_gear_length = landing_gear["length"]
-        self.lnd_gear_diam = landing_gear["diameter"]
-
-        self.carbon_fiber_density = cfg["carbon_fiber_density"]
-
         # Derived geometry
-        boom_half_length = self.boom_len / 2
-        body_diagonal_xy = math.sqrt(self.body_hx**2 + self.body_hy**2)
-        boom_radius = self.boom_diam / 2
+        boom_half_length = 0.1
+        body_diagonal_xy = math.sqrt(0.125**2 + 0.125**2)
+        boom_radius = 0.025
         diagonal_boom = body_diagonal_xy + boom_half_length - boom_radius
         self.diagonal_motor = diagonal_boom + boom_half_length
-        self.body_diagonal_xy = body_diagonal_xy
 
         self.motor_arm_length = self.diagonal_motor
         self.motor_angles = [-(2 * i + 1) * math.pi / 4 for i in range(4)]
+        self.max_motor_thrust = 50
+        self.motor_torque_coeff = 0.05
+        self.motor_spin_dirs = [1, -1, 1, -1]
 
     def compute_control_wrench(
         self, actuator_controls: list[float], body_q

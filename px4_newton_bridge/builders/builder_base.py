@@ -10,5 +10,5 @@ class BuilderBase(ABC):
         self.vehicle_dir = vehicle_dir
 
     @abstractmethod
-    def build(self, builder: ModelBuilder, body: int) -> None:
+    def build(self, builder: ModelBuilder) -> None:
         """Build the model using Newton's model builder."""

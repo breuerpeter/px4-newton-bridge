@@ -13,7 +13,7 @@ class URDFBuilder(BuilderBase):
     of the vehicle folder.
     """
 
-    def build(self, builder: newton.ModelBuilder, body: int) -> None:
+    def build(self, builder: newton.ModelBuilder) -> None:
         urdf_dir = self.vehicle_dir / "urdf"
         urdf_files = glob.glob(str(urdf_dir / "*.urdf"))
         if len(urdf_files) != 1:
@@ -23,9 +23,9 @@ class URDFBuilder(BuilderBase):
 
         builder.add_urdf(
             urdf_files[0],
-            xform=wp.transform_identity(),
+            # xform=wp.transform_identity(),
             floating=True,
-            collapse_fixed_joints=True,
+            # collapse_fixed_joints=True,
             ignore_inertial_definitions=False,
             enable_self_collisions=False,
         )

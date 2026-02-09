@@ -23,17 +23,8 @@ class Simulator:
         self.mavlink = MAVLinkInterface()
 
         builder = newton.ModelBuilder()
-
-        init_pos_body = wp.vec3(0.0, 0.0, 1.0)
-        init_att_body = wp.quat_identity()
-        init_tf_body = wp.transform(init_pos_body, init_att_body)
-
-        body = builder.add_body(xform=init_tf_body)
-
-        self.vehicle_builder.build(builder, body)
-
+        self.vehicle_builder.build(builder)
         builder.add_ground_plane()
-
         self.model = builder.finalize()
 
         logger.debug(f"body_q={self.model.body_q}")
