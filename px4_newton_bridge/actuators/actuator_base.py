@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 class ActuatorBase(ABC):
     def __init__(self, cfg):
         self.cfg = cfg
+        self.rpms = [0.0, 0.0, 0.0, 0.0]
 
     @abstractmethod
     def compute_control_wrench(
