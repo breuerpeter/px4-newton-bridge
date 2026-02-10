@@ -20,7 +20,8 @@ class PropellerBasic(ActuatorBase):
         self.diagonal_motor = diagonal_boom + boom_half_length
 
         self.motor_arm_length = self.diagonal_motor
-        self.motor_angles = [-(2 * i + 1) * math.pi / 4 for i in range(4)]
+        # Motor positions in FRD body frame (X=forward, Y=right)
+        self.motor_angles = [(2 * i + 1) * math.pi / 4 for i in range(4)]
         self.max_motor_thrust = 50
         self.motor_torque_coeff = 0.05
         self.motor_spin_dirs = [1, -1, 1, -1]
@@ -57,11 +58,13 @@ class PropellerBasic(ActuatorBase):
             motor_x = self.motor_arm_length * math.cos(self.motor_angles[i])
             motor_y = self.motor_arm_length * math.sin(self.motor_angles[i])
 
-            torque_x += motor_y * thrust
-            torque_y += -motor_x * thrust
-            torque_z += -self.motor_spin_dirs[i] * self.motor_torque_coeff * thrust
+            # Torque = r × F where F = (0, 0, -thrust) in FRD (thrust upward = -Z)
+            torque_x += -motor_y * thrust
+            torque_y += motor_x * thrust
+            torque_z += self.motor_spin_dirs[i] * self.motor_torque_coeff * thrust
 
-        force_world = wp.quat_rotate(body_rot, wp.vec3(0, 0, total_thrust))
+        # Thrust upward = -Z in FRD body frame
+        force_world = wp.quat_rotate(body_rot, wp.vec3(0, 0, -total_thrust))
         torque_world = wp.quat_rotate(body_rot, wp.vec3(torque_x, torque_y, torque_z))
 
         return [

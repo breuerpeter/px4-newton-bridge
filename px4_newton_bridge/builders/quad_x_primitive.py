@@ -49,20 +49,24 @@ class QuadXPrimitive(BuilderBase):
         self.motor_angles = [-(2 * i + 1) * math.pi / 4 for i in range(4)]
 
     def build(self, builder: newton.ModelBuilder) -> None:
-
+        # Body-local frame is FRD (Forward-Right-Down), matching PX4 body convention.
+        # The 180° X rotation maps FRD body axes to Newton's z-up world.
         init_pos_body = wp.vec3(0.0, 0.0, 1.0)
-        init_att_body = wp.quat_identity()
+        init_att_body = wp.quat_from_axis_angle(wp.vec3(1, 0, 0), wp.pi)
         init_tf_body = wp.transform(init_pos_body, init_att_body)
 
         body = builder.add_body(xform=init_tf_body)
+
+        # Rotate cylinder (axis along shape Z) to lay horizontal (axis along body X)
         boom_rot_y = wp.quat_from_axis_angle(wp.vec3(0, 1, 0), wp.half_pi)
 
         boom_half_length = self.boom_len / 2
         boom_radius = self.boom_diam / 2
         diagonal_boom = self.body_diagonal_xy + boom_half_length - boom_radius
 
+        # Landing gear tilt: splay outward in +Z (downward in FRD)
         lnd_gear_rot_y = wp.quat_from_axis_angle(
-            wp.vec3(0, 1, 0), -self.lnd_gear_angle_rad
+            wp.vec3(0, 1, 0), self.lnd_gear_angle_rad
         )
 
         # Central body
@@ -75,8 +79,10 @@ class QuadXPrimitive(BuilderBase):
             key="fuselage",
         )
 
+        # All shape positions below are in FRD body-local frame:
+        # X = forward, Y = right, Z = down
         for i in range(4):
-            boom_angle = (2 * i + 1) * wp.pi / 4
+            boom_angle = -(2 * i + 1) * wp.pi / 4
             boom_rot_z = wp.quat_from_axis_angle(wp.vec3(0, 0, 1), boom_angle)
             boom_rot = boom_rot_z * boom_rot_y
 
@@ -110,12 +116,12 @@ class QuadXPrimitive(BuilderBase):
 
             # Landing gear
             lnd_gear_rot = boom_rot_z * lnd_gear_rot_y
-            top_local = wp.vec3(0.0, 0.0, self.lnd_gear_length / 2)
+            top_local = wp.vec3(0.0, 0.0, -self.lnd_gear_length / 2)
             top_offset = wp.quat_rotate(lnd_gear_rot, top_local)
             attachment_point = wp.vec3(
                 self.body_diagonal_xy * math.cos(boom_angle),
                 self.body_diagonal_xy * math.sin(boom_angle),
-                -self.body_hz,
+                self.body_hz,  # below body = +Z in FRD
             )
             lnd_gear_shift = attachment_point - top_offset
             builder.add_shape_cylinder(
@@ -126,13 +132,13 @@ class QuadXPrimitive(BuilderBase):
                 cfg=newton.ModelBuilder.ShapeConfig(density=self.carbon_fiber_density),
             )
 
-        # GPS antenna
+        # GPS antenna (above body = -Z in FRD)
         gps_ant_radius = 0.02
         gps_ant_half_height = 0.05
         gps_antenna_shift = wp.vec3(
             self.body_hx - gps_ant_radius,
             0.0,
-            self.body_hz + gps_ant_half_height,
+            -(self.body_hz + gps_ant_half_height),
         )
         builder.add_shape_cylinder(
             body,

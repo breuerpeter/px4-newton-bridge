@@ -169,19 +169,16 @@ class Simulator:
         )
         acc_body = wp.quat_rotate_inv(quat, acc_world)
 
-        # Accelerometer reading = specific force = acceleration - gravity
-        # Convert from Newton FLU (Forward-Left-Up) to PX4 FRD (Forward-Right-Down)
-        # 180° rotation about X axis: x_frd = x_flu, y_frd = -y_flu, z_frd = -z_flu
+        # Accelerometer = specific force = acceleration - gravity (FRD body frame)
         xacc = acc_body[0] - gravity_body[0] + random.gauss(0, 0.02)
-        yacc = -(acc_body[1] - gravity_body[1]) + random.gauss(0, 0.02)
-        zacc = -(acc_body[2] - gravity_body[2]) + random.gauss(0, 0.02)
+        yacc = acc_body[1] - gravity_body[1] + random.gauss(0, 0.02)
+        zacc = acc_body[2] - gravity_body[2] + random.gauss(0, 0.02)
 
-        # Gyroscope (angular velocity in body frame)
+        # Gyroscope (angular velocity in FRD body frame)
         vel_angular_body = wp.quat_rotate_inv(quat, wp.vec3(vel_angular))
-        # Convert from FLU to FRD
         xgyro = vel_angular_body[0] + random.gauss(0, 0.02)
-        ygyro = -vel_angular_body[1] + random.gauss(0, 0.02)
-        zgyro = -vel_angular_body[2] + random.gauss(0, 0.02)
+        ygyro = vel_angular_body[1] + random.gauss(0, 0.02)
+        zgyro = vel_angular_body[2] + random.gauss(0, 0.02)
 
         # Magnetometer - World Magnetic Model for Zurich (lat: 47.4°, lon: 8.5°)
         # Hardcoded WMM values for Zurich
@@ -202,13 +199,11 @@ class Simulator:
         # Convert NED to Newton world frame (X=North, Y=East, Z=Up)
         mag_world = wp.vec3(mag_n, mag_e, -mag_d)
 
-        # Rotate to body frame (FLU)
+        # Rotate to FRD body frame
         mag_body = wp.quat_rotate_inv(quat, mag_world)
-
-        # Convert from FLU to FRD and add noise
         xmag = mag_body[0] + random.gauss(0, 0.02)
-        ymag = -mag_body[1] + random.gauss(0, 0.02)
-        zmag = -mag_body[2] + random.gauss(0, 0.03)
+        ymag = mag_body[1] + random.gauss(0, 0.02)
+        zmag = mag_body[2] + random.gauss(0, 0.03)
 
         # Barometer
         # Approximate pressure from altitude (simplified model)
@@ -257,10 +252,10 @@ class Simulator:
             lon = int((ref_lon + lon_offset) * 1e7)
             alt = int((ref_alt + altitude) * 1000)  # mm
 
-            # Velocity in cm/s (NED frame)
+            # Velocity in cm/s: Newton world (X=N, Y=W, Z=Up) → NED
             vn = int(vel_linear[0] * 100)
-            ve = int(-vel_linear[1] * 100)  # y_frd (px4)= -y_flu(newton)
-            vd = int(-vel_linear[2] * 100)  # Down is negative z
+            ve = int(-vel_linear[1] * 100)  # East = -West
+            vd = int(-vel_linear[2] * 100)  # Down = -Up
 
             vel = int(math.sqrt(vel_linear[0] ** 2 + vel_linear[1] ** 2) * 100)
 
