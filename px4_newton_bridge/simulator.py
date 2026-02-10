@@ -19,6 +19,7 @@ class Simulator:
 
         self.sim_dt = 0.004  # [s] (250 Hz, matches Gazebo default)
         self.sim_time = 0.0
+        self.rng = random.Random(42)  # deterministic sensor noise
 
         self.mavlink = MAVLinkInterface()
 
@@ -170,15 +171,15 @@ class Simulator:
         acc_body = wp.quat_rotate_inv(quat, acc_world)
 
         # Accelerometer = specific force = acceleration - gravity (FRD body frame)
-        xacc = acc_body[0] - gravity_body[0] + random.gauss(0, 0.02)
-        yacc = acc_body[1] - gravity_body[1] + random.gauss(0, 0.02)
-        zacc = acc_body[2] - gravity_body[2] + random.gauss(0, 0.02)
+        xacc = acc_body[0] - gravity_body[0] + self.rng.gauss(0, 0.02)
+        yacc = acc_body[1] - gravity_body[1] + self.rng.gauss(0, 0.02)
+        zacc = acc_body[2] - gravity_body[2] + self.rng.gauss(0, 0.02)
 
         # Gyroscope (angular velocity in FRD body frame)
         vel_angular_body = wp.quat_rotate_inv(quat, wp.vec3(vel_angular))
-        xgyro = vel_angular_body[0] + random.gauss(0, 0.02)
-        ygyro = vel_angular_body[1] + random.gauss(0, 0.02)
-        zgyro = vel_angular_body[2] + random.gauss(0, 0.02)
+        xgyro = vel_angular_body[0] + self.rng.gauss(0, 0.02)
+        ygyro = vel_angular_body[1] + self.rng.gauss(0, 0.02)
+        zgyro = vel_angular_body[2] + self.rng.gauss(0, 0.02)
 
         # Magnetometer - World Magnetic Model for Zurich (lat: 47.4°, lon: 8.5°)
         # Hardcoded WMM values for Zurich
@@ -201,9 +202,9 @@ class Simulator:
 
         # Rotate to FRD body frame
         mag_body = wp.quat_rotate_inv(quat, mag_world)
-        xmag = mag_body[0] + random.gauss(0, 0.02)
-        ymag = mag_body[1] + random.gauss(0, 0.02)
-        zmag = mag_body[2] + random.gauss(0, 0.03)
+        xmag = mag_body[0] + self.rng.gauss(0, 0.02)
+        ymag = mag_body[1] + self.rng.gauss(0, 0.02)
+        zmag = mag_body[2] + self.rng.gauss(0, 0.03)
 
         # Barometer
         # Approximate pressure from altitude (simplified model)

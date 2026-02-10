@@ -24,7 +24,7 @@ class URDFBuilder(BuilderBase):
         builder.add_urdf(
             urdf_files[0],
             xform=wp.transform(
-                wp.vec3(0, 0, 0), wp.quat_from_axis_angle(wp.vec3(1, 0, 0), wp.pi)
+                wp.vec3(0, 0, 1.0), wp.quat_from_axis_angle(wp.vec3(1, 0, 0), wp.pi)
             ),
             floating=True,
             # collapse_fixed_joints=True,
