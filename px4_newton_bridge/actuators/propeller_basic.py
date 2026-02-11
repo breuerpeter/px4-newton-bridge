@@ -1,5 +1,6 @@
 import math
 
+import newton
 import warp as wp
 
 from .actuator_base import ActuatorBase
@@ -31,9 +32,6 @@ class PropellerBasic(ActuatorBase):
         rpm_desired = motor_cmd * 3800  # todo max rpm
         alpha = 1.0 - math.exp(-0.004 / 0.033)  # todo sim_dt and motor_tau
         self.rpms[motor_idx] += alpha * (rpm_desired - self.rpms[motor_idx])
-        # for rotating prop viz:
-        # todo: 1. set joint angles and speeds (joint_q, joint_qd) from this
-        # todo: 2. update body poses with eval_fk() (updates body_q and body_qd) (doesnt change dynamics, only kinematic)
 
     def compute_control_wrench(
         self, actuator_controls: list[float], body_q
@@ -75,6 +73,26 @@ class PropellerBasic(ActuatorBase):
             torque_world[1],
             torque_world[2],
         ]
+
+    def update_rotor_visuals(self, state, model, dt: float) -> None:
+        """Set rotor joint angles and velocities from motor RPMs, then run FK."""
+        if model.joint_dof_count <= 6:
+            return  # No rotor joints (e.g. primitive model)
+
+        joint_q = state.joint_q.numpy()
+        joint_qd = state.joint_qd.numpy()
+
+        for i in range(4):
+            # RPM → rad/s. Negate spin_dir because in FRD the joint Z axis
+            # points down, so positive rotation = CW from above, but
+            # spin_dir=1 means CCW from above.
+            omega = -self.motor_spin_dirs[i] * self.rpms[i] * 2 * math.pi / 60
+            joint_q[7 + i] += omega * dt
+            joint_qd[6 + i] = omega
+
+        state.joint_q.assign(joint_q)
+        state.joint_qd.assign(joint_qd)
+        newton.eval_fk(model, state.joint_q, state.joint_qd, state)
 
 
 """

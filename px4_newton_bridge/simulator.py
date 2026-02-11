@@ -44,8 +44,11 @@ class Simulator:
         logger.debug(f"control dim {self.model.joint_dof_count}")
 
         # Pre-allocate Warp array for joint forces (used by CUDA graph)
-        # joint_f format: [fx, fy, fz, tx, ty, tz] in world frame
-        self._joint_f_buffer = wp.zeros(6, dtype=wp.float32, device=wp.get_device())
+        # First 6 elements: [fx, fy, fz, tx, ty, tz] wrench for floating base
+        # Remaining elements (if any): zero (no torque on rotor joints)
+        self._joint_f_buffer = wp.zeros(
+            self.model.joint_dof_count, dtype=wp.float32, device=wp.get_device()
+        )
 
         # Buffer to store previous body velocities for acceleration computation
         self._body_qd_prev = wp.zeros_like(self.state0.body_qd)
@@ -110,18 +113,24 @@ class Simulator:
         self.mavlink.receive_actuator_controls(timeout=None)
 
         # Compute wrench from actuator commands (CPU, before graph launch)
-        joint_f_world = self.vehicle_actuator.compute_control_wrench(
+        wrench = self.vehicle_actuator.compute_control_wrench(
             self.mavlink.actuator_controls, self.state0.body_q.numpy()
         )
 
-        # Update the force buffer used by physics simulation
-        self._joint_f_buffer.assign(joint_f_world)
+        # Pad wrench (6 DOFs) to full joint_f size (zeros for rotor joints)
+        joint_f = wrench + [0.0] * (self.model.joint_dof_count - 6)
+        self._joint_f_buffer.assign(joint_f)
 
         # Run physics (uses CUDA graph if available)
         if self.graph:
             wp.capture_launch(self.graph)
         else:
             self._simulate_physics()
+
+        # Update rotor joint angles/velocities for visualization
+        self.vehicle_actuator.update_rotor_visuals(
+            self.state0, self.model, self.sim_dt
+        )
 
     def _send_sensor_data(self):
         """Send simulated sensor data to PX4."""

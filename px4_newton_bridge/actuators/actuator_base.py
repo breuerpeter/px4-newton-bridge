@@ -14,3 +14,6 @@ class ActuatorBase(ABC):
         Newton takes control input in form of a wrench (with respect to world frame) for every body.
         Wrench: [fx, fy, fz, tx, ty, tz] where f is force and t is torque.
         """
+
+    def update_rotor_visuals(self, state, model, dt: float) -> None:
+        """Update rotor joint angles/velocities for visualization. No-op by default."""
