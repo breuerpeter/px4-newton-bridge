@@ -36,6 +36,7 @@ class Simulator:
         self.solver = newton.solvers.SolverMuJoCo(self.model, njmax=224)
 
         self.state0 = self.model.state()
+        newton.eval_fk(self.model, self.model.joint_q, self.model.joint_qd, self.state0)
         self.state1 = self.model.state()
         self.control = self.model.control()
         self.contacts = self.model.collide(self.state0)
