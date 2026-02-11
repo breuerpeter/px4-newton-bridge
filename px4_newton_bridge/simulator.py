@@ -1,6 +1,4 @@
-import math
 import os
-import random
 import time
 
 import newton
@@ -13,15 +11,20 @@ from .mavlink_interface import MAVLinkInterface
 
 
 class Simulator:
-    def __init__(self, vehicle_builder: BuilderBase, vehicle_actuator: ActuatorBase):
+    def __init__(
+        self,
+        cfg: dict,
+        mavlink_interface: MAVLinkInterface,
+        vehicle_builder: BuilderBase,
+        vehicle_actuator: ActuatorBase,
+    ):
         self.vehicle_builder = vehicle_builder
         self.vehicle_actuator = vehicle_actuator
 
-        self.sim_dt = 0.004  # [s] (250 Hz, matches Gazebo default)
+        self.sim_dt = cfg["sim_dt"]
         self.sim_time = 0.0
-        self.rng = random.Random(42)  # deterministic sensor noise
 
-        self.mavlink = MAVLinkInterface()
+        self.mav = mavlink_interface
 
         builder = newton.ModelBuilder()
         self.vehicle_builder.build(builder)
@@ -85,17 +88,6 @@ class Simulator:
         )
         self.state0.assign(self.state1)
 
-    def wait_for_px4(self):
-        """Send sensor data until PX4 starts responding with actuator controls."""
-        logger.info("Waiting for PX4 to start lockstep...")
-        while True:
-            self.sim_time += self.sim_dt
-            self.mavlink.send_heartbeat()
-            self._send_sensor_data()
-            if self.mavlink.receive_actuator_controls(timeout=1.0):
-                logger.info("PX4 lockstep established")
-                return
-
     def simulate(self):
         """Full simulation step including MAVLink I/O and physics.
 
@@ -104,17 +96,19 @@ class Simulator:
         2. Wait (blocking) for actuator controls from PX4
         3. Run physics with received controls
         """
-        self.mavlink.send_heartbeat()
+        self.mav.send_heartbeat()
 
         # Step PX4
-        self._send_sensor_data()
+        self.mav._send_sensor_data(
+            self.state0, self._body_qd_prev.numpy(), self.sim_time
+        )
 
         # Block waiting for actuator controls (lockstep synchronization)
-        self.mavlink.receive_actuator_controls(timeout=None)
+        self.mav.receive_actuator_controls(timeout=None)
 
         # Compute wrench from actuator commands (CPU, before graph launch)
         wrench = self.vehicle_actuator.compute_control_wrench(
-            self.mavlink.actuator_controls, self.state0.body_q.numpy()
+            self.mav.actuator_controls, self.state0.body_q.numpy()
         )
 
         # Pad wrench (6 DOFs) to full joint_f size (zeros for rotor joints)
@@ -128,176 +122,7 @@ class Simulator:
             self._simulate_physics()
 
         # Update rotor joint angles/velocities for visualization
-        self.vehicle_actuator.update_rotor_visuals(
-            self.state0, self.model, self.sim_dt
-        )
-
-    def _send_sensor_data(self):
-        """Send simulated sensor data to PX4."""
-        time_usec = int(self.sim_time * 1e6)
-
-        # Get current state from simulation
-        # body_q contains position and quaternion for each body
-        # body_qd contains linear and angular velocity for each body
-        body_q = self.state0.body_q.numpy()
-        body_qd = self.state0.body_qd.numpy()
-        body_qd_prev = self._body_qd_prev.numpy()
-
-        # Extract vehicle state (body index 0)
-        # Position: [x, y, z]
-        pos = body_q[0, :3]
-        # Quaternion: [x, y, z, w] (warp convention)
-        quat_xyzw = body_q[0, 3:7]
-        # Convert to [w, x, y, z] for MAVLink
-        quat_wxyz = [quat_xyzw[3], quat_xyzw[0], quat_xyzw[1], quat_xyzw[2]]
-
-        # Velocity: [vx, vy, vz, wx, wy, wz] (linear, angular)
-        vel_linear = body_qd[0, :3]
-        vel_linear_prev = body_qd_prev[0, :3]
-        vel_angular = body_qd[0, 3:6]
-
-        # Acceleration: [x, y, z]
-        acc_linear = (vel_linear - vel_linear_prev) / self.sim_dt
-
-        # IMU data (accelerometer measures specific force in body frame)
-        # Specific force = linear_acceleration - gravity (both in body frame)
-        # Transform world frame vectors to body frame using inverse quaternion rotation
-        quat = wp.quat(
-            float(quat_xyzw[0]),
-            float(quat_xyzw[1]),
-            float(quat_xyzw[2]),
-            float(quat_xyzw[3]),
-        )
-
-        # Gravity in world frame (pointing down)
-        gravity_world = wp.vec3(0.0, 0.0, -9.81)
-        # Transform gravity to body frame
-        gravity_body = wp.quat_rotate_inv(quat, gravity_world)
-
-        # Linear acceleration in world frame, transform to body frame
-        acc_world = wp.vec3(
-            float(acc_linear[0]), float(acc_linear[1]), float(acc_linear[2])
-        )
-        acc_body = wp.quat_rotate_inv(quat, acc_world)
-
-        # Accelerometer = specific force = acceleration - gravity (FRD body frame)
-        xacc = acc_body[0] - gravity_body[0] + self.rng.gauss(0, 0.02)
-        yacc = acc_body[1] - gravity_body[1] + self.rng.gauss(0, 0.02)
-        zacc = acc_body[2] - gravity_body[2] + self.rng.gauss(0, 0.02)
-
-        # Gyroscope (angular velocity in FRD body frame)
-        vel_angular_body = wp.quat_rotate_inv(quat, wp.vec3(vel_angular))
-        xgyro = vel_angular_body[0] + self.rng.gauss(0, 0.02)
-        ygyro = vel_angular_body[1] + self.rng.gauss(0, 0.02)
-        zgyro = vel_angular_body[2] + self.rng.gauss(0, 0.02)
-
-        # Magnetometer - World Magnetic Model for Zurich (lat: 47.4°, lon: 8.5°)
-        # Hardcoded WMM values for Zurich
-        declination_rad = math.radians(3.0)  # ~3° East (magnetic north vs true north)
-        inclination_rad = math.radians(64.0)  # ~64° dip angle (field points into earth)
-        field_strength_gauss = 0.48
-
-        # Construct magnetic field in NED frame
-        # mag_ned = Dcm(Euler(0, -inclination, declination)) * [H, 0, 0]
-        mag_n = (
-            field_strength_gauss * math.cos(declination_rad) * math.cos(inclination_rad)
-        )
-        mag_e = field_strength_gauss * math.sin(declination_rad)
-        mag_d = (
-            field_strength_gauss * math.cos(declination_rad) * math.sin(inclination_rad)
-        )
-
-        # Convert NED to Newton world frame (X=North, Y=East, Z=Up)
-        mag_world = wp.vec3(mag_n, mag_e, -mag_d)
-
-        # Rotate to FRD body frame
-        mag_body = wp.quat_rotate_inv(quat, mag_world)
-        xmag = mag_body[0] + self.rng.gauss(0, 0.02)
-        ymag = mag_body[1] + self.rng.gauss(0, 0.02)
-        zmag = mag_body[2] + self.rng.gauss(0, 0.03)
-
-        # Barometer
-        # Approximate pressure from altitude (simplified model)
-        altitude = pos[2]  # z is up in simulation
-        sea_level_pressure = 1013.25  # hPa
-        # Barometric formula approximation
-        abs_pressure = sea_level_pressure * (1 - 2.25577e-5 * altitude) ** 5.25588
-        pressure_alt = altitude
-
-        # Send HIL_SENSOR at simulation rate
-        self.mavlink.send_hil_sensor(
-            time_usec=time_usec,
-            xacc=xacc,
-            yacc=yacc,
-            zacc=zacc,
-            xgyro=xgyro,
-            ygyro=ygyro,
-            zgyro=zgyro,
-            xmag=xmag,
-            ymag=ymag,
-            zmag=zmag,
-            abs_pressure=abs_pressure,
-            pressure_alt=pressure_alt,
-        )
-
-        # Send GPS at lower rate (10 Hz)
-        if (
-            self.sim_time - self.mavlink.last_hil_gps_time
-            >= self.mavlink.hil_gps_interval
-        ):
-            self.mavlink.last_hil_gps_time = self.sim_time
-
-            # Convert simulation position to GPS coordinates
-            # Using a reference point (Zurich) and adding local offsets
-            # 1 degree latitude ~= 111km, 1 degree longitude ~= 111km * cos(lat)
-            ref_lat = 47.3977418  # Reference latitude
-            ref_lon = 8.5455939  # Reference longitude
-            ref_alt = 488.0  # Reference altitude MSL [m]
-
-            # Position offset in meters (x=East, y=North in typical GPS convention)
-            # Simulation uses x=forward, y=left, z=up
-            lat_offset = pos[0] / 111000.0  # Approximate
-            lon_offset = pos[1] / (111000.0 * math.cos(math.radians(ref_lat)))
-
-            lat = int((ref_lat + lat_offset) * 1e7)
-            lon = int((ref_lon + lon_offset) * 1e7)
-            alt = int((ref_alt + altitude) * 1000)  # mm
-
-            # Velocity in cm/s: Newton world (X=N, Y=W, Z=Up) → NED
-            vn = int(vel_linear[0] * 100)
-            ve = int(-vel_linear[1] * 100)  # East = -West
-            vd = int(-vel_linear[2] * 100)  # Down = -Up
-
-            vel = int(math.sqrt(vel_linear[0] ** 2 + vel_linear[1] ** 2) * 100)
-
-            self.mavlink.send_hil_gps(
-                time_usec=time_usec,
-                lat=lat,
-                lon=lon,
-                alt=alt,
-                vn=vn,
-                ve=ve,
-                vd=vd,
-                vel=vel,
-            )
-
-            # Also send full state for visualization/logging
-            self.mavlink.send_hil_state_quaternion(
-                time_usec=time_usec,
-                attitude_quaternion=quat_wxyz,
-                rollspeed=xgyro,
-                pitchspeed=ygyro,
-                yawspeed=zgyro,
-                lat=lat,
-                lon=lon,
-                alt=alt,
-                vx=vn,
-                vy=ve,
-                vz=vd,
-                xacc=int(xacc * 1000 / 9.81),  # Convert to mG
-                yacc=int(yacc * 1000 / 9.81),
-                zacc=int(zacc * 1000 / 9.81),
-            )
+        self.vehicle_actuator.update_rotor_visuals(self.state0, self.model, self.sim_dt)
 
     def step(self):
         # Increment sim_time BEFORE simulate() so sensor data has non-zero timestamps

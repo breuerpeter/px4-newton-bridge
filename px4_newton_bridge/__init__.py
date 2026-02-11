@@ -1,8 +1,9 @@
-"""PX4 SITL bridge for Newton physics engine."""
+"""PX4 SITL bridge for the Newton physics engine."""
 
 import pathlib
 
 import yaml
+
 from .actuators.actuator_base import ActuatorBase
 from .actuators.propeller_basic import PropellerBasic
 from .builders.builder_base import BuilderBase
@@ -18,16 +19,23 @@ _ACTUATOR_TYPES: dict[str, type[ActuatorBase]] = {
     "propeller_basic": PropellerBasic,
 }
 
-_CONFIGS_DIR = pathlib.Path(__file__).parent / "vehicles"
+_BRIDGE_DIR = pathlib.Path(__file__).parent
+_MAIN_CFG = _BRIDGE_DIR / "config.yaml"
+_MODEL_CFG_DIR = _BRIDGE_DIR / "vehicles"
+
+
+def get_cfg() -> dict:
+    with open(_MAIN_CFG) as f:
+        cfg = yaml.safe_load(f)
+    return cfg
 
 
 def load_model(name: str) -> tuple[BuilderBase, ActuatorBase]:
-    """Load a model (build structure and get actuator object) by config name (e.g. 'quad_x_primitive')."""
-    cfg_path = _CONFIGS_DIR / name / "model.yaml"
+    cfg_path = _MODEL_CFG_DIR / name / "model.yaml"
     if not cfg_path.exists():
         available = [
             p.name
-            for p in _CONFIGS_DIR.iterdir()
+            for p in _MODEL_CFG_DIR.iterdir()
             if p.is_dir() and (p / "model.yaml").exists()
         ]
         raise FileNotFoundError(
@@ -50,4 +58,6 @@ def load_model(name: str) -> tuple[BuilderBase, ActuatorBase]:
         )
 
     vehicle_dir = cfg_path.parent
-    return _BUILDER_TYPES[builder_type](cfg, vehicle_dir), _ACTUATOR_TYPES[actuator_type](cfg)
+    return _BUILDER_TYPES[builder_type](cfg, vehicle_dir), _ACTUATOR_TYPES[
+        actuator_type
+    ](cfg)

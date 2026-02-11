@@ -17,12 +17,12 @@ class Viewer(ViewerRerun):
         └── TextLogView (logs)
     """
 
-    def __init__(self, sim_dt: float, **kwargs):
-        self._sim_dt = sim_dt
+    def __init__(self, cfg: dict):
+        self._sim_dt = cfg["sim_dt"]
         self._frame_count = 0
         self._last_fps_time = time.time()
         self._fps_interval = 0.5
-        super().__init__(**kwargs)
+        super().__init__()
 
     def _get_blueprint(self):
         return rrb.Blueprint(

@@ -1,0 +1,1 @@
+sim_dt: 0.004 # [s] (250 Hz, matches Gazebo default)
