@@ -54,28 +54,11 @@ class MAVLinkInterface:
 
         self.actuator_controls = [0.0] * self.NUM_ACTUATOR_CHANNELS
 
-        self.last_hb_time = 0.0
         self.last_hil_sensor_time = 0.0
         self.last_hil_gps_time = 0.0
 
-        self.hb_interval = 1.0 / 1.0  # [s]
         self.hil_sensor_interval = 1.0 / 250.0  # [s]
         self.hil_gps_interval = 1.0 / 10.0  # [s]
-
-    def send_heartbeat(self):
-        """
-        Send hearbeat (HEARTBEAT) message to PX4.
-        """
-        now = time.time()
-        if now - self.last_hb_time >= self.hb_interval:
-            self.proto.heartbeat_send(
-                mavutil.mavlink.MAV_TYPE_QUADROTOR,
-                mavutil.mavlink.MAV_AUTOPILOT_GENERIC,
-                0,  # base_mode
-                0,  # custom_mode
-                mavutil.mavlink.MAV_STATE_ACTIVE,
-            )
-            self.last_hb_time = now
 
     def receive_actuator_controls(self, timeout: float | None = None) -> bool:
         """
@@ -268,7 +251,6 @@ class MAVLinkInterface:
         sim_time = 0
         while True:
             sim_time += self.sim_dt
-            self.send_heartbeat()
             self._send_sensor_data(current_state, body_qd_prev, sim_time)
             if self.receive_actuator_controls(timeout=1.0):
                 logger.info("PX4 lockstep established")

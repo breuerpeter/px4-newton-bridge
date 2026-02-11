@@ -96,8 +96,6 @@ class Simulator:
         2. Wait (blocking) for actuator controls from PX4
         3. Run physics with received controls
         """
-        self.mav.send_heartbeat()
-
         # Step PX4
         self.mav._send_sensor_data(
             self.state0, self._body_qd_prev.numpy(), self.sim_time
