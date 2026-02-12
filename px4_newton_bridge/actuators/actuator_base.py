@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 
+import newton
+
 
 class ActuatorBase(ABC):
     def __init__(self, cfg):
@@ -7,9 +9,14 @@ class ActuatorBase(ABC):
         self.rpms = [0.0, 0.0, 0.0, 0.0]
 
     @abstractmethod
-    def compute_control_wrench(
-        self, actuator_controls: list[float], body_q
-    ) -> list[float]:
+    def apply_forces_and_torques(
+        self,
+        actuator_controls: list[float],
+        model: newton.Model,
+        current_state,
+        joint_f,
+        body_f,
+    ):
         """Compute control input for Newton based on actuator control inputs from PX4.
         Newton takes control input in form of a wrench (with respect to world frame) for every body.
         Wrench: [fx, fy, fz, tx, ty, tz] where f is force and t is torque.

@@ -55,7 +55,7 @@ class QuadXPrimitive(BuilderBase):
         init_att_body = wp.quat_from_axis_angle(wp.vec3(1, 0, 0), wp.pi)
         init_tf_body = wp.transform(init_pos_body, init_att_body)
 
-        body = builder.add_body(xform=init_tf_body)
+        body = builder.add_body(xform=init_tf_body, key="body_frd")
 
         # Rotate cylinder (axis along shape Z) to lay horizontal (axis along body X)
         boom_rot_y = wp.quat_from_axis_angle(wp.vec3(0, 1, 0), wp.half_pi)

@@ -12,38 +12,36 @@ class PropellerBasic(ActuatorBase):
 
     def __init__(self, cfg: dict):
         super().__init__(cfg)
-
-        # Derived geometry
-        boom_half_length = 0.1
-        body_diagonal_xy = math.sqrt(0.125**2 + 0.125**2)
-        boom_radius = 0.025
-        diagonal_boom = body_diagonal_xy + boom_half_length - boom_radius
-        self.diagonal_motor = diagonal_boom + boom_half_length
-
-        self.motor_arm_length = self.diagonal_motor
-        # Motor positions in FRD body frame (X=forward, Y=right)
-        self.motor_angles = [(2 * i + 1) * math.pi / 4 for i in range(4)]
-        self.max_motor_thrust = 50
         self.motor_torque_coeff = 0.05
-        self.motor_spin_dirs = [1, -1, 1, -1]
 
     def step_motor_model(self, motor_idx: int, motor_cmd: float):
         """First order model"""
-        rpm_desired = motor_cmd * 3800  # todo max rpm
+        rpm_desired = motor_cmd * 3800  # todo max rpm 3800
         alpha = 1.0 - math.exp(-0.004 / 0.033)  # todo sim_dt and motor_tau
         self.rpms[motor_idx] += alpha * (rpm_desired - self.rpms[motor_idx])
 
-    def compute_control_wrench(
-        self, actuator_controls: list[float], body_q
-    ) -> list[float]:
+    def apply_forces_and_torques(
+        self, actuator_controls: list[float], model, current_state, joint_f, body_f
+    ):
 
-        # todo: set body wrenches with state.body_f (switch from control.joint_f)
-        body_rot = wp.quatf(body_q[0, 3:7])
+        # TODO: this will break quad_x, since it is single-body
 
-        total_thrust = 0.0
-        torque_x = 0.0
-        torque_y = 0.0
-        torque_z = 0.0
+        # Forces:
+        # - Thrust (acts at propeller, body_f)
+        # - (NEGLECTED FOR NOW) Aerodynamic drag
+        # - (NEGLECTED FOR NOW) Dynamic lift
+        # - (NEGLECTED FOR NOW) Induced drag
+        #
+        # Note: gravitational force applied by Newton
+        #
+        # Torques:
+        # - Drag torque (acts at propeller, joint_f)
+        # - (NEGLECTED FOR NOW) Aerodynamic torque
+
+        body_f_list = [0.0] * 6  # start with base body
+        joint_f_list = [0.0] * 6
+
+        q_base_frd = wp.quat(current_state.body_q.numpy()[0, 3:7])
 
         for i in range(4):
             motor_cmd = max(0.0, min(1.0, actuator_controls[i]))
@@ -51,28 +49,28 @@ class PropellerBasic(ActuatorBase):
             thrust = (
                 0.000003463 * self.rpms[i] ** 2
             )  # todo: self.motor_max_thrust / max_rpm*2
-            total_thrust += thrust
 
-            motor_x = self.motor_arm_length * math.cos(self.motor_angles[i])
-            motor_y = self.motor_arm_length * math.sin(self.motor_angles[i])
+            q_prop_i = wp.quat(
+                current_state.body_q.numpy()[i + 1, 3:7]
+            )  # index 0 is body_frd
 
-            # Torque = r × F where F = (0, 0, -thrust) in FRD (thrust upward = -Z)
-            torque_x += -motor_y * thrust
-            torque_y += motor_x * thrust
-            torque_z += self.motor_spin_dirs[i] * self.motor_torque_coeff * thrust
+            # TODO: precompute
+            prop_i_pos_z_world = wp.quat_rotate(q_prop_i, wp.vec3(0, 0, 1))
+            body_frd_pos_z_world = wp.quat_rotate(q_base_frd, wp.vec3(0, 0, 1))
+            # body_frd frame points down, so if prop z axis also points down (dot product positive), thrust sign is negative
+            thrust_sign = -wp.sign(wp.dot(prop_i_pos_z_world, body_frd_pos_z_world))
 
-        # Thrust upward = -Z in FRD body frame
-        force_world = wp.quat_rotate(body_rot, wp.vec3(0, 0, -total_thrust))
-        torque_world = wp.quat_rotate(body_rot, wp.vec3(torque_x, torque_y, torque_z))
+            thrust_world = wp.quat_rotate(
+                q_prop_i, wp.vec3(0, 0, 1) * thrust_sign * thrust
+            )
+            body_f_list.extend([*thrust_world, 0, 0, 0])
 
-        return [
-            force_world[0],
-            force_world[1],
-            force_world[2],
-            torque_world[0],
-            torque_world[1],
-            torque_world[2],
-        ]
+            # drag_torque = thrust * self.motor_torque_coeff
+            drag_torque = 0  # TODO: WHY does this work, ie why can we still yaw
+            joint_f_list.append(drag_torque)
+
+        joint_f.assign(joint_f_list)
+        body_f.assign(body_f_list)
 
     def update_rotor_visuals(self, state, model, dt: float) -> None:
         """Set rotor joint angles and velocities from motor RPMs, then run FK."""
@@ -83,10 +81,7 @@ class PropellerBasic(ActuatorBase):
         joint_qd = state.joint_qd.numpy()
 
         for i in range(4):
-            # RPM → rad/s. Negate spin_dir because in FRD the joint Z axis
-            # points down, so positive rotation = CW from above, but
-            # spin_dir=1 means CCW from above.
-            omega = -self.motor_spin_dirs[i] * self.rpms[i] * 2 * math.pi / 60
+            omega = self.rpms[i] * 2 * math.pi / 60
             joint_q[7 + i] += omega * dt
             joint_qd[6 + i] = omega
 

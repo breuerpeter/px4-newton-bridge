@@ -53,6 +53,10 @@ class Simulator:
             self.model.joint_dof_count, dtype=wp.float32, device=wp.get_device()
         )
 
+        self._body_f_buffer = wp.zeros(
+            6 * self.model.body_count, dtype=wp.float32, device=wp.get_device()
+        )
+
         # Buffer to store previous body velocities for acceleration computation
         self._body_qd_prev = wp.zeros_like(self.state0.body_qd)
 
@@ -82,6 +86,7 @@ class Simulator:
         self._body_qd_prev.assign(self.state0.body_qd)
         self.state0.clear_forces()
         self.control.joint_f.assign(self._joint_f_buffer)
+        self.state0.body_f.assign(self._body_f_buffer)
         self.contacts = self.model.collide(self.state0)
         self.solver.step(
             self.state0, self.state1, self.control, self.contacts, self.sim_dt
@@ -105,13 +110,13 @@ class Simulator:
         self.mav.receive_actuator_controls(timeout=None)
 
         # Compute wrench from actuator commands (CPU, before graph launch)
-        wrench = self.vehicle_actuator.compute_control_wrench(
-            self.mav.actuator_controls, self.state0.body_q.numpy()
+        self.vehicle_actuator.apply_forces_and_torques(
+            self.mav.actuator_controls,
+            self.model,
+            self.state0,
+            self._joint_f_buffer,
+            self._body_f_buffer,
         )
-
-        # Pad wrench (6 DOFs) to full joint_f size (zeros for rotor joints)
-        joint_f = wrench + [0.0] * (self.model.joint_dof_count - 6)
-        self._joint_f_buffer.assign(joint_f)
 
         # Run physics (uses CUDA graph if available)
         if self.graph:
