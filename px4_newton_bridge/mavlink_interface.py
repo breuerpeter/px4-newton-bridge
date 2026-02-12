@@ -347,8 +347,10 @@ class MAVLinkInterface:
         altitude = pos[2]  # z is up in simulation
         sea_level_pressure = 1013.25  # hPa
         # Barometric formula approximation
-        abs_pressure = sea_level_pressure * (1 - 2.25577e-5 * altitude) ** 5.25588
-        pressure_alt = altitude
+        abs_pressure = sea_level_pressure * (
+            1 - 2.25577e-5 * altitude
+        ) ** 5.25588 + self.rng.gauss(0, 0.02)
+        pressure_alt = altitude + self.rng.gauss(0, 0.02)
 
         # Send HIL_SENSOR at simulation rate
         self.send_hil_sensor(
