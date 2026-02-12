@@ -295,7 +295,7 @@ class MAVLinkInterface:
             float(quat_xyzw[3]),
         )
 
-        # Gravity in world frame (pointing down)
+        # Gravity in Newton's (FLU, i.e., Z-up) world frame (pointing down)
         gravity_world = wp.vec3(0.0, 0.0, -9.81)
         # Transform gravity to body frame
         gravity_body = wp.quat_rotate_inv(quat, gravity_world)
