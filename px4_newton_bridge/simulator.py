@@ -31,6 +31,11 @@ class Simulator:
         builder.add_ground_plane()
         self.model = builder.finalize()
 
+        for i, key in enumerate(self.model.body_key):
+            mass = self.model.body_mass.numpy()[i]
+            inertia = self.model.body_inertia.numpy()[i]
+            logger.debug(f"Body {i} ({key}): mass = {mass}, inertia =\n{inertia}")
+
         logger.debug(f"body_q={self.model.body_q}")
         logger.debug(f"body_qd={self.model.body_qd}")
         logger.debug(f"joint_q={self.model.joint_q}")
