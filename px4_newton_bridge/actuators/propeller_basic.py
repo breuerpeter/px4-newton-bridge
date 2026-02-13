@@ -12,7 +12,7 @@ class PropellerBasic(ActuatorBase):
 
     def __init__(self, cfg: dict):
         super().__init__(cfg)
-        self.motor_torque_coeff = 0.05
+        self.motor_torque_coeff = cfg["motor"]["torque_coeff"]
 
     def step_motor_model(self, motor_idx: int, motor_cmd: float):
         """First order model"""
@@ -21,10 +21,8 @@ class PropellerBasic(ActuatorBase):
         self.rpms[motor_idx] += alpha * (rpm_desired - self.rpms[motor_idx])
 
     def apply_forces_and_torques(
-        self, actuator_controls: list[float], model, current_state, joint_f, body_f
+        self, actuator_controls: list[float], model, current_state, body_f
     ):
-
-        # TODO: this will break quad_x, since it is single-body
 
         # Forces:
         # - Thrust (acts at propeller, body_f)
@@ -39,7 +37,7 @@ class PropellerBasic(ActuatorBase):
         # - (NEGLECTED FOR NOW) Aerodynamic torque
 
         body_f_list = [0.0] * 6  # start with base body
-        joint_f_list = [0.0] * 6
+        drag_world_total_list = [0.0] * 3
 
         q_base_frd = wp.quat(current_state.body_q.numpy()[0, 3:7])
 
@@ -60,16 +58,18 @@ class PropellerBasic(ActuatorBase):
             # body_frd frame points down, so if prop z axis also points down (dot product positive), thrust sign is negative
             thrust_sign = -wp.sign(wp.dot(prop_i_pos_z_world, body_frd_pos_z_world))
 
+            prop_i_rot_axis_world = wp.quat_rotate(q_prop_i, wp.vec3(0, 0, 1))
+            # Drag torque opposes positive joint-coordinate spin
+            drag_world = -thrust * self.motor_torque_coeff * prop_i_rot_axis_world
+
             thrust_world = wp.quat_rotate(
                 q_prop_i, wp.vec3(0, 0, 1) * thrust_sign * thrust
             )
             body_f_list.extend([*thrust_world, 0, 0, 0])
+            for idx in range(3):
+                drag_world_total_list[idx] += drag_world[idx]
 
-            # drag_torque = thrust * self.motor_torque_coeff
-            drag_torque = 0  # TODO: WHY does this work, ie why can we still yaw
-            joint_f_list.append(drag_torque)
-
-        joint_f.assign(joint_f_list)
+        body_f_list[3:6] = drag_world_total_list
         body_f.assign(body_f_list)
 
     def update_rotor_visuals(self, state, model, dt: float) -> None:

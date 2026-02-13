@@ -14,7 +14,6 @@ class ActuatorBase(ABC):
         actuator_controls: list[float],
         model: newton.Model,
         current_state,
-        joint_f,
         body_f,
     ):
         """Compute control input for Newton based on actuator control inputs from PX4.

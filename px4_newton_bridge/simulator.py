@@ -49,10 +49,6 @@ class Simulator:
         # Pre-allocate Warp array for joint forces (used by CUDA graph)
         # First 6 elements: [fx, fy, fz, tx, ty, tz] wrench for floating base
         # Remaining elements (if any): zero (no torque on rotor joints)
-        self._joint_f_buffer = wp.zeros(
-            self.model.joint_dof_count, dtype=wp.float32, device=wp.get_device()
-        )
-
         self._body_f_buffer = wp.zeros(
             6 * self.model.body_count, dtype=wp.float32, device=wp.get_device()
         )
@@ -85,7 +81,6 @@ class Simulator:
         """
         self._body_qd_prev.assign(self.state0.body_qd)
         self.state0.clear_forces()
-        self.control.joint_f.assign(self._joint_f_buffer)
         self.state0.body_f.assign(self._body_f_buffer)
         self.contacts = self.model.collide(self.state0)
         self.solver.step(
@@ -114,7 +109,6 @@ class Simulator:
             self.mav.actuator_controls,
             self.model,
             self.state0,
-            self._joint_f_buffer,
             self._body_f_buffer,
         )
 
