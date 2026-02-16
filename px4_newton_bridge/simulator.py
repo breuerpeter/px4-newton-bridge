@@ -27,19 +27,10 @@ class Simulator:
         self.mav = mavlink_interface
 
         builder = newton.ModelBuilder()
-        self.vehicle_builder.build(builder)
         builder.add_ground_plane()
+        self.vehicle_builder.build(builder)
         self.model = builder.finalize()
-
-        for i, key in enumerate(self.model.body_key):
-            mass = self.model.body_mass.numpy()[i]
-            inertia = self.model.body_inertia.numpy()[i]
-            logger.debug(f"Body {i} ({key}): mass = {mass}, inertia =\n{inertia}")
-
-        logger.debug(f"body_q={self.model.body_q}")
-        logger.debug(f"body_qd={self.model.body_qd}")
-        logger.debug(f"joint_q={self.model.joint_q}")
-        logger.debug(f"joint_qd={self.model.joint_qd}")
+        self.vehicle_builder.model_debug_print(self.model)
 
         self.solver = newton.solvers.SolverMuJoCo(self.model, njmax=224)
 
