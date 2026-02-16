@@ -4,8 +4,6 @@ import pathlib
 
 import yaml
 
-from .actuators.actuator_base import ActuatorBase
-from .actuators.propeller_basic import PropellerBasic
 from .builders.builder_base import BuilderBase
 from .builders.quad_x_primitive import QuadXPrimitive
 from .builders.urdf import URDFBuilder
@@ -13,10 +11,6 @@ from .builders.urdf import URDFBuilder
 _BUILDER_TYPES: dict[str, type[BuilderBase]] = {
     "quad_x_primitive": QuadXPrimitive,
     "urdf": URDFBuilder,
-}
-
-_ACTUATOR_TYPES: dict[str, type[ActuatorBase]] = {
-    "propeller_basic": PropellerBasic,
 }
 
 _BRIDGE_DIR = pathlib.Path(__file__).parent
@@ -49,12 +43,6 @@ def load_model(name: str) -> BuilderBase:
     if builder_type not in _BUILDER_TYPES:
         raise ValueError(
             f"Unknown builder type '{builder_type}'. Registered: {list(_BUILDER_TYPES)}"
-        )
-
-    actuator_type = cfg.get("actuator")
-    if actuator_type not in _ACTUATOR_TYPES:
-        raise ValueError(
-            f"Unknown actuator type '{actuator_type}'. Registered: {list(_ACTUATOR_TYPES)}"
         )
 
     vehicle_dir = cfg_path.parent
