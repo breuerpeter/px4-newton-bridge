@@ -129,8 +129,10 @@ class Simulator:
             self.state0, self._body_qd_prev.numpy(), self.sim_time
         )
 
-        # Block waiting for actuator controls (lockstep synchronization)
-        self.mav.receive_actuator_controls(timeout=None)
+        # Block waiting for actuator controls (lockstep synchronization).
+        # Timeout ensures the bridge exits if PX4 dies.
+        if not self.mav.receive_actuator_controls(timeout=5.0):
+            raise ConnectionError("PX4 did not respond within 5 s — lockstep lost")
 
         # Copy actuator controls to GPU (H2D transfer, cannot be in CUDA graph)
         self.actuator_controls.assign(self.mav.actuator_controls[:4])
