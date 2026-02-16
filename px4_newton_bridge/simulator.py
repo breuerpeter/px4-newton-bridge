@@ -18,6 +18,8 @@ class Simulator:
         vehicle_builder: BuilderBase,
         vehicle_actuator: ActuatorBase,
     ):
+        logger.debug(f"Default device: { wp.get_device() }")
+
         self.vehicle_builder = vehicle_builder
         self.vehicle_actuator = vehicle_actuator
 
