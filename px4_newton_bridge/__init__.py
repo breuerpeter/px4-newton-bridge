@@ -30,7 +30,7 @@ def get_cfg() -> dict:
     return cfg
 
 
-def load_model(name: str) -> tuple[BuilderBase, ActuatorBase]:
+def load_model(name: str) -> BuilderBase:
     cfg_path = _MODEL_CFG_DIR / name / "model.yaml"
     if not cfg_path.exists():
         available = [
@@ -58,6 +58,4 @@ def load_model(name: str) -> tuple[BuilderBase, ActuatorBase]:
         )
 
     vehicle_dir = cfg_path.parent
-    return _BUILDER_TYPES[builder_type](cfg, vehicle_dir), _ACTUATOR_TYPES[
-        actuator_type
-    ](cfg)
+    return _BUILDER_TYPES[builder_type](cfg, vehicle_dir)

@@ -5,6 +5,12 @@ import newton
 import warp as wp
 
 from .actuators import ActuatorBase
+from .actuators.propeller_basic import (
+    MotorModel,
+    step_motor_model,
+    update_body_f,
+    update_rotor_states,
+)
 from .builders import BuilderBase
 from .logging import logger
 from .mavlink_interface import MAVLinkInterface
@@ -16,15 +22,25 @@ class Simulator:
         cfg: dict,
         mavlink_interface: MAVLinkInterface,
         vehicle_builder: BuilderBase,
-        vehicle_actuator: ActuatorBase,
+        # vehicle_actuator: ActuatorBase,
     ):
         logger.debug(f"Default device: { wp.get_device() }")
 
         self.vehicle_builder = vehicle_builder
-        self.vehicle_actuator = vehicle_actuator
+        # self.vehicle_actuator = vehicle_actuator
 
         self.sim_dt = cfg["sim_dt"]
         self.sim_time = 0.0
+
+        self.motor_params = MotorModel()
+        self.motor_params.rpm_max = 3800
+        self.motor_params.tau = 0.033
+        self.motor_params.ct = 0.000003463
+        self.motor_params.cd = 0.05
+        self.motor_params.dt = 0.004
+
+        self.rpms = wp.zeros(4)
+        self.actuator_controls = wp.zeros(4)
 
         self.mav = mavlink_interface
 
@@ -43,13 +59,6 @@ class Simulator:
         self.contacts = self.model.collide(self.state0)
 
         logger.debug(f"control dim {self.model.joint_dof_count}")
-
-        # Pre-allocate Warp array for joint forces (used by CUDA graph)
-        # First 6 elements: [fx, fy, fz, tx, ty, tz] wrench for floating base
-        # Remaining elements (if any): zero (no torque on rotor joints)
-        self._body_f_buffer = wp.zeros(
-            6 * self.model.body_count, dtype=wp.float32, device=wp.get_device()
-        )
 
         # Buffer to store previous body velocities for acceleration computation
         self._body_qd_prev = wp.zeros_like(self.state0.body_qd)
@@ -77,9 +86,30 @@ class Simulator:
         Steps state0 into state1, then copies state1 back to state0 so the
         CUDA graph always operates on the same buffers across replays.
         """
+        wp.launch(
+            step_motor_model,
+            dim=4,
+            inputs=(self.actuator_controls, self.motor_params),
+            outputs=(self.rpms,),
+        )
+        wp.launch(
+            update_rotor_states,
+            dim=4,
+            inputs=(self.motor_params, self.rpms),
+            outputs=(self.state0.joint_q, self.state0.joint_qd),
+        )
+        # newton.eval_fk(
+        # self.model, self.state0.joint_q, self.state0.joint_qd, self.state0
+        # )
+
         self._body_qd_prev.assign(self.state0.body_qd)
         self.state0.clear_forces()
-        self.state0.body_f.assign(self._body_f_buffer)
+        wp.launch(
+            update_body_f,
+            dim=4,
+            inputs=(self.motor_params, self.state0.body_q, self.rpms),
+            outputs=(self.state0.body_f,),
+        )
         self.contacts = self.model.collide(self.state0)
         self.solver.step(
             self.state0, self.state1, self.control, self.contacts, self.sim_dt
@@ -102,22 +132,14 @@ class Simulator:
         # Block waiting for actuator controls (lockstep synchronization)
         self.mav.receive_actuator_controls(timeout=None)
 
-        # Compute wrench from actuator commands (CPU, before graph launch)
-        self.vehicle_actuator.apply_forces_and_torques(
-            self.mav.actuator_controls,
-            self.model,
-            self.state0,
-            self._body_f_buffer,
-        )
+        # Copy actuator controls to GPU (H2D transfer, cannot be in CUDA graph)
+        self.actuator_controls.assign(self.mav.actuator_controls[:4])
 
         # Run physics (uses CUDA graph if available)
         if self.graph:
             wp.capture_launch(self.graph)
         else:
             self._simulate_physics()
-
-        # Update rotor joint angles/velocities for visualization
-        self.vehicle_actuator.update_rotor_visuals(self.state0, self.model, self.sim_dt)
 
     def step(self):
         # Increment sim_time BEFORE simulate() so sensor data has non-zero timestamps
