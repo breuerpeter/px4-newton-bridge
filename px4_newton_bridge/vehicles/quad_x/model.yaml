@@ -1,5 +1,4 @@
 builder: quad_x_primitive
-actuator: propeller_basic
 
 body:
   density: 800        # kg/m^3

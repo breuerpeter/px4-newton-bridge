@@ -4,16 +4,15 @@ import time
 import newton
 import warp as wp
 
-from .actuators import ActuatorBase
-from .actuators.propeller_basic import (
+from .builders import BuilderBase
+from .logging import logger
+from .mavlink_interface import MAVLinkInterface
+from .propeller_basic import (
     MotorModel,
     step_motor_model,
     update_body_f,
     update_rotor_states,
 )
-from .builders import BuilderBase
-from .logging import logger
-from .mavlink_interface import MAVLinkInterface
 
 
 class Simulator:

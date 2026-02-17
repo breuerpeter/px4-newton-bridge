@@ -1,5 +1,4 @@
 builder: urdf
-actuator: propeller_basic
 
 motor:
   max_thrust: 50.0    # per motor [N]
