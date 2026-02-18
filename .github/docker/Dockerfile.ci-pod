@@ -1,0 +1,53 @@
+FROM nvidia/cuda:13.0.1-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# PX4 SITL build dependencies + test build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    make \
+    cmake \
+    ninja-build \
+    g++ \
+    gcc-arm-none-eabi \
+    software-properties-common \
+    # Test binary build
+    clang \
+    wget \
+    ca-certificates \
+    curl \
+    # SSH server (required by RunPod)
+    openssh-server \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 3.11
+RUN add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    python3.11-dev \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# uv for Python package management
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+ENV UV_PYTHON=python3.11
+
+# PX4 build Python deps
+RUN pip3 install --no-cache-dir \
+    'empy>=3.3,<4' \
+    'jinja2>=2.8' \
+    jsonschema \
+    kconfiglib \
+    packaging \
+    pyros-genmsg \
+    pyyaml
+
+# MAVSDK C++ library (for test binary)
+RUN wget -q https://github.com/mavlink/MAVSDK/releases/download/v3.0.0/libmavsdk-dev_3.0.0_ubuntu22.04_amd64.deb \
+    && dpkg -i libmavsdk-dev_3.0.0_ubuntu22.04_amd64.deb \
+    && rm libmavsdk-dev_3.0.0_ubuntu22.04_amd64.deb
+
+RUN git config --global --add safe.directory '*'
+
+WORKDIR /workspace

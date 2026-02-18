@@ -1,0 +1,135 @@
+name: GPU SITL Integration Test
+
+on:
+  push:
+    branches: ["**"]
+
+concurrency:
+  group: gpu-sitl-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUNPOD_GPU_TYPE: "NVIDIA RTX 4000 Ada Generation"
+
+jobs:
+  gpu-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create RunPod pod
+        id: create-pod
+        run: |
+          RESPONSE=$(curl -s --request POST \
+            --header 'content-type: application/json' \
+            --url "https://api.runpod.io/graphql?api_key=${{ secrets.RUNPOD_API_KEY }}" \
+            --data '{
+              "query": "mutation { podFindAndDeployOnDemand(input: { cloudType: SECURE, gpuCount: 1, volumeInGb: 0, containerDiskInGb: 50, gpuTypeId: \"'"$RUNPOD_GPU_TYPE"'\", name: \"ci-sitl-${{ github.run_id }}\", templateId: \"${{ vars.RUNPOD_TEMPLATE_ID }}\", ports: \"22/tcp\" }) { id } }"
+            }')
+
+          echo "RunPod response: $RESPONSE"
+
+          POD_ID=$(echo "$RESPONSE" | jq -r '.data.podFindAndDeployOnDemand.id // empty')
+          if [ -z "$POD_ID" ]; then
+            echo "::error::Failed to create RunPod pod"
+            echo "$RESPONSE" | jq .
+            exit 1
+          fi
+
+          echo "pod_id=$POD_ID" >> "$GITHUB_OUTPUT"
+          echo "Pod created: $POD_ID"
+
+      - name: Wait for pod SSH
+        id: wait-ssh
+        run: |
+          POD_ID="${{ steps.create-pod.outputs.pod_id }}"
+
+          for i in $(seq 1 60); do
+            RESPONSE=$(curl -s --request POST \
+              --header 'content-type: application/json' \
+              --url "https://api.runpod.io/graphql?api_key=${{ secrets.RUNPOD_API_KEY }}" \
+              --data '{
+                "query": "query { pod(input: {podId: \"'"$POD_ID"'\"}) { id desiredStatus runtime { uptimeInSeconds ports { ip isIpPublic privatePort publicPort type } } } }"
+              }')
+
+            SSH_IP=$(echo "$RESPONSE" | jq -r '.data.pod.runtime.ports[]? | select(.privatePort == 22) | .ip // empty')
+            SSH_PORT=$(echo "$RESPONSE" | jq -r '.data.pod.runtime.ports[]? | select(.privatePort == 22) | .publicPort // empty')
+
+            if [ -n "$SSH_IP" ] && [ -n "$SSH_PORT" ]; then
+              echo "ssh_host=$SSH_IP" >> "$GITHUB_OUTPUT"
+              echo "ssh_port=$SSH_PORT" >> "$GITHUB_OUTPUT"
+              echo "SSH ready: $SSH_IP:$SSH_PORT"
+              exit 0
+            fi
+
+            STATUS=$(echo "$RESPONSE" | jq -r '.data.pod.desiredStatus // "unknown"')
+            echo "Waiting for SSH... attempt $i/60 (status: $STATUS)"
+            sleep 10
+          done
+
+          echo "::error::Pod SSH not ready after 10 minutes"
+          exit 1
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.RUNPOD_SSH_PRIVATE_KEY }}" > ~/.ssh/runpod_key
+          chmod 600 ~/.ssh/runpod_key
+          cat >> ~/.ssh/config <<EOF
+          Host runpod
+            HostName ${{ steps.wait-ssh.outputs.ssh_host }}
+            Port ${{ steps.wait-ssh.outputs.ssh_port }}
+            User root
+            IdentityFile ~/.ssh/runpod_key
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+
+      - name: Run SITL test on pod
+        id: test
+        run: |
+          # Wait a few seconds for SSH daemon to fully initialize
+          sleep 5
+
+          ssh runpod "bash -s" -- \
+            "${{ github.sha }}" \
+            "${{ secrets.PX4_REPO_URL }}" \
+            < .github/scripts/run_test_on_pod.sh 2>&1 | tee test_output.log
+
+          echo "test_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Post results to job summary
+        if: always()
+        run: |
+          echo '## GPU SITL Test Results' >> "$GITHUB_STEP_SUMMARY"
+          if [ -f test_output.log ]; then
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            tail -60 test_output.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'No test output captured.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Terminate RunPod pod
+        if: always()
+        run: |
+          POD_ID="${{ steps.create-pod.outputs.pod_id }}"
+          [ -z "$POD_ID" ] && exit 0
+
+          curl -s --request POST \
+            --header 'content-type: application/json' \
+            --url "https://api.runpod.io/graphql?api_key=${{ secrets.RUNPOD_API_KEY }}" \
+            --data '{
+              "query": "mutation { podTerminate(input: { podId: \"'"$POD_ID"'\" }) }"
+            }'
+
+          echo "Pod $POD_ID terminated"
+
+      - name: Check test result
+        if: steps.test.outputs.test_exit != '0'
+        run: |
+          echo "::error::SITL test failed (exit code: ${{ steps.test.outputs.test_exit }})"
+          exit 1
