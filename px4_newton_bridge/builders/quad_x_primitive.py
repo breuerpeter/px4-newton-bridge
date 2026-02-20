@@ -52,7 +52,7 @@ class QuadXPrimitive(BuilderBase):
     def build(self, builder: newton.ModelBuilder) -> None:
         # Body-local frame is FRD (Forward-Right-Down), matching PX4 body convention.
         # The 180° X rotation maps FRD body axes to Newton's z-up world.
-        init_pos_body = wp.vec3(0.0, 0.0, 1.0)
+        init_pos_body = wp.vec3(0.0, 0.0, 0.3)
         init_att_body = wp.quat_from_axis_angle(wp.vec3(1, 0, 0), wp.pi)
 
         body = builder.add_link(key="body_frd")

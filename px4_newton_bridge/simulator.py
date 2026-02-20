@@ -1,6 +1,7 @@
 import os
 import time
 
+import numpy as np
 import newton
 import warp as wp
 
@@ -13,6 +14,11 @@ from .propeller_basic import (
     update_body_f,
     update_rotor_states,
 )
+
+
+STABILIZE_VEL_THRESHOLD = 0.01  # m/s
+STABILIZE_MIN_STEPS = 10
+STABILIZE_MAX_STEPS = 10000
 
 
 class Simulator:
@@ -28,7 +34,7 @@ class Simulator:
         self.vehicle_builder = vehicle_builder
         # self.vehicle_actuator = vehicle_actuator
 
-        self.sim_dt = cfg["sim_dt"]
+        self.sim_dt = cfg["sim"]["dt"]
         self.sim_time = 0.0
 
         self.motor_params = MotorModel()
@@ -139,6 +145,24 @@ class Simulator:
             wp.capture_launch(self.graph)
         else:
             self._simulate_physics()
+
+    def stabilize(self):
+        """Step physics with zero actuator inputs until the body settles.
+
+        This should be called before wait_for_px4 so PX4 receives sensor data
+        at the resting position rather than at the spawn height.
+        """
+        for i in range(STABILIZE_MAX_STEPS):
+            self._simulate_physics()
+            wp.synchronize()
+            body_qd = self.state0.body_qd.numpy()
+            linear_vel = np.linalg.norm(body_qd[0, :3])
+
+            if i > STABILIZE_MIN_STEPS and linear_vel < STABILIZE_VEL_THRESHOLD:
+                logger.info(f"Stabilized after {i + 1} steps (vel={linear_vel:.4f} m/s)")
+                return
+
+        logger.warning(f"Stabilization did not converge after {STABILIZE_MAX_STEPS} steps (vel={linear_vel:.4f} m/s)")
 
     def step(self):
         # Increment sim_time BEFORE simulate() so sensor data has non-zero timestamps

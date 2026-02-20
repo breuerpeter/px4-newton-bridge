@@ -1,1 +1,6 @@
-sim_dt: 0.004 # [s] (250 Hz, matches Gazebo default)
+sim:
+  dt: 0.004 # [s] (250 Hz, matches Gazebo default)
+
+viewer:
+  want_replay: true # Enabling will enable timeline scrubbing, but may increase viewer latency due to larger data stream.
+  export_rrd: true # Enabling will export a .rrd (Rerun recording) to build/px4_sitl_default/rootfs/log/newton.rrd. Note: this will disable the webviewer stream

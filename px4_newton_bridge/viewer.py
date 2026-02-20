@@ -1,8 +1,17 @@
 import time
+from pathlib import Path
 
 import rerun as rr
 import rerun.blueprint as rrb
 from newton.viewer import ViewerRerun
+
+_LOG_ROOT = (
+    Path(__file__).resolve().parents[5]
+    / "build"
+    / "px4_sitl_default"
+    / "rootfs"
+    / "log"
+)
 
 
 class Viewer(ViewerRerun):
@@ -18,11 +27,20 @@ class Viewer(ViewerRerun):
     """
 
     def __init__(self, cfg: dict):
-        self._sim_dt = cfg["sim_dt"]
+        self._sim_dt = cfg["sim"]["dt"]
         self._frame_count = 0
         self._last_fps_time = time.time()
         self._fps_interval = 0.5
-        super().__init__()
+        self._want_replay = cfg["viewer"]["want_replay"]
+        self._export_rrd = cfg["viewer"]["export_rrd"]
+        super().__init__(
+            rec_id="px4-newton",
+            keep_historical_data=self._want_replay,
+        )
+        # TODO: rr.save() already called by super().__init__() but doesn't work (file is very small and doesn't contain any logged data). The following is a workaround
+        if self._export_rrd:
+            _LOG_ROOT.mkdir(parents=True, exist_ok=True)
+            rr.save(str(_LOG_ROOT / "newton.rrd"))
 
     def _get_blueprint(self):
         return rrb.Blueprint(

@@ -29,7 +29,7 @@ class MAVLinkInterface:
     def __init__(
         self, cfg: dict, ip: str = "0.0.0.0", sysid: int = 1, compid: int = 200
     ):
-        self.sim_dt = cfg["sim_dt"]
+        self.sim_dt = cfg["sim"]["dt"]
         self.rng = random.Random(42)  # deterministic sensor noise
         conn_string = f"tcpin:{ip}:4560"
         logger.info(f"Waiting for PX4 connection on {conn_string}...")

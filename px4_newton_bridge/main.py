@@ -27,6 +27,7 @@ def main():
     sim = Simulator(cfg, mav, load_model(args.vehicle))
     viewer.set_model(sim.model)
 
+    sim.stabilize()
     sim.sim_time = mav.wait_for_px4(sim.state0, sim._body_qd_prev.numpy())
 
     while viewer.is_running():
@@ -35,7 +36,6 @@ def main():
         viewer.begin_frame(sim.sim_time)
         viewer.log_state(sim.state0)
         viewer.end_frame()
-        wp.synchronize()
 
     viewer.close()
 
