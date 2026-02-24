@@ -1,4 +1,3 @@
-import os
 import time
 
 import numpy as np
@@ -27,7 +26,6 @@ class Simulator:
         cfg: dict,
         mavlink_interface: MAVLinkInterface,
         vehicle_builder: BuilderBase,
-        # vehicle_actuator: ActuatorBase,
     ):
         logger.debug(f"Default device: { wp.get_device() }")
 
@@ -70,8 +68,8 @@ class Simulator:
 
         self.capture()
 
-        self.speed_factor = float(os.environ.get("PX4_REAL_TIME_FACTOR", 0))
-        logger.info(f"Real time factor: {self.speed_factor}")
+        self.rtf = cfg["sim"].get("rtf", 0)
+        logger.info(f"Real time factor: {self.rtf}")
         self._step_start_time = time.time()
 
     def capture(self):
@@ -171,9 +169,9 @@ class Simulator:
         # simulate() handles I/O and physics (with CUDA graph if available)
         self.simulate()
 
-        if self.speed_factor > 0:
+        if self.rtf > 0:
             step_time = time.time() - self._step_start_time
-            target_step_time = self.sim_dt / self.speed_factor
+            target_step_time = self.sim_dt / self.rtf
             sleep_time = target_step_time - step_time
             if sleep_time > 0:
                 time.sleep(sleep_time)

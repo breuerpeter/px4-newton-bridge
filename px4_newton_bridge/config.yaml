@@ -1,6 +1,8 @@
 sim:
   dt: 0.004 # [s] (250 Hz, matches Gazebo default)
+  device: null # Warp compute device, e.g. 'cpu', 'cuda:0'. null = auto (prefers GPU).
+  rtf: 0.7 # Real-time factor. 0 disables throttling.
 
 viewer:
-  want_replay: true # Enabling will enable timeline scrubbing, but may increase viewer latency due to larger data stream.
-  export_rrd: true # Enabling will export a .rrd (Rerun recording) to build/px4_sitl_default/rootfs/log/newton.rrd. Note: this will disable the webviewer stream
+  want_replay: false # Enabling will enable timeline scrubbing, but may increase viewer latency due to larger data stream.
+  export_rrd: false # Enabling will export a .rrd (Rerun recording) to build/px4_sitl_default/rootfs/log/newton.rrd. Note: this will disable the webviewer stream

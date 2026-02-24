@@ -22,6 +22,11 @@ def main():
     args = parser.parse_args()
 
     cfg = get_cfg()
+
+    device = cfg["sim"].get("device")
+    if device:
+        wp.set_device(device)
+
     viewer = Viewer(cfg)
     mav = MAVLinkInterface(cfg)
     sim = Simulator(cfg, mav, load_model(args.vehicle))
