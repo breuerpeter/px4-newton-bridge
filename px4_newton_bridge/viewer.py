@@ -5,14 +5,6 @@ import rerun as rr
 import rerun.blueprint as rrb
 from newton.viewer import ViewerRerun
 
-_LOG_ROOT = (
-    Path(__file__).resolve().parents[5]
-    / "build"
-    / "px4_sitl_default"
-    / "rootfs"
-    / "log"
-)
-
 
 class Viewer(ViewerRerun):
     """ViewerRerun subclass with a custom blueprint for the PX4 Newton bridge.
@@ -31,16 +23,12 @@ class Viewer(ViewerRerun):
         self._frame_count = 0
         self._last_fps_time = time.time()
         self._fps_interval = 0.5
-        self._want_replay = cfg["viewer"]["want_replay"]
-        self._export_rrd = cfg["viewer"]["export_rrd"]
+
         super().__init__(
             rec_id="px4-newton",
-            keep_historical_data=self._want_replay,
+            keep_historical_data=True,
+            address="rerun+http://127.0.0.1:9876/proxy",
         )
-        # TODO: rr.save() already called by super().__init__() but doesn't work (file is very small and doesn't contain any logged data). The following is a workaround
-        if self._export_rrd:
-            _LOG_ROOT.mkdir(parents=True, exist_ok=True)
-            rr.save(str(_LOG_ROOT / "newton.rrd"))
 
     def _get_blueprint(self):
         return rrb.Blueprint(

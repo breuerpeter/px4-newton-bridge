@@ -28,7 +28,6 @@ class URDFBuilder(BuilderBase):
                 wp.vec3(0, 0, 2), wp.quat_from_axis_angle(wp.vec3(1, 0, 0), wp.pi)
             ),
             floating=True,
-            # collapse_fixed_joints=True,
             ignore_inertial_definitions=False,
             enable_self_collisions=False,
         )
