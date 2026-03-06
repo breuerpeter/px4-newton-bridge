@@ -1,7 +1,7 @@
 import time
 
-import numpy as np
 import newton
+import numpy as np
 import warp as wp
 
 from .builders import BuilderBase
@@ -13,7 +13,6 @@ from .propeller_basic import (
     update_body_f,
     update_rotor_states,
 )
-
 
 STABILIZE_VEL_THRESHOLD = 0.01  # m/s
 STABILIZE_MIN_STEPS = 10
@@ -30,7 +29,6 @@ class Simulator:
         logger.debug(f"Default device: { wp.get_device() }")
 
         self.vehicle_builder = vehicle_builder
-        # self.vehicle_actuator = vehicle_actuator
 
         self.sim_dt = cfg["sim"]["dt"]
         self.sim_time = 0.0
@@ -157,10 +155,14 @@ class Simulator:
             linear_vel = np.linalg.norm(body_qd[0, :3])
 
             if i > STABILIZE_MIN_STEPS and linear_vel < STABILIZE_VEL_THRESHOLD:
-                logger.info(f"Stabilized after {i + 1} steps (vel={linear_vel:.4f} m/s)")
+                logger.info(
+                    f"Stabilized after {i + 1} steps (vel={linear_vel:.4f} m/s)"
+                )
                 return
 
-        logger.warning(f"Stabilization did not converge after {STABILIZE_MAX_STEPS} steps (vel={linear_vel:.4f} m/s)")
+        logger.warning(
+            f"Stabilization did not converge after {STABILIZE_MAX_STEPS} steps (vel={linear_vel:.4f} m/s)"
+        )
 
     def step(self):
         # Increment sim_time BEFORE simulate() so sensor data has non-zero timestamps
