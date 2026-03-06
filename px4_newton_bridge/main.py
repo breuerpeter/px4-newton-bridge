@@ -23,9 +23,8 @@ def main():
 
     cfg = get_cfg()
 
-    device = cfg["sim"].get("device")
-    if device:
-        wp.set_device(device)
+    if cfg["physics"]["force_cpu"]:
+        wp.set_device("cpu")
 
     viewer = Viewer(cfg)
     mav = MAVLinkInterface(cfg)

@@ -1,6 +1,10 @@
 """PX4 SITL bridge for the Newton physics engine."""
 
+import json
+import os
 import pathlib
+import sys
+
 # Ensure the newton submodule is importable
 _NEWTON_DIR = str(pathlib.Path(__file__).resolve().parent.parent / "newton")
 if _NEWTON_DIR not in sys.path:
@@ -8,6 +12,7 @@ if _NEWTON_DIR not in sys.path:
 
 import yaml
 
+from .logging import logger
 from .builders.builder_base import BuilderBase
 from .builders.quad_x_primitive import QuadXPrimitive
 from .builders.urdf import URDFBuilder
@@ -22,9 +27,25 @@ _MAIN_CFG = _BRIDGE_DIR / "config.yaml"
 _MODEL_CFG_DIR = _BRIDGE_DIR / "vehicles"
 
 
+def _deep_merge(base: dict, override: dict, path: str = "") -> dict:
+    for k, v in override.items():
+        key_path = f"{path}.{k}" if path else k
+        if k in base and isinstance(base[k], dict) and isinstance(v, dict):
+            _deep_merge(base[k], v, key_path)
+        else:
+            logger.info(f"Config override: {key_path} = {v!r}")
+            base[k] = v
+    return base
+
+
 def get_cfg() -> dict:
     with open(_MAIN_CFG) as f:
         cfg = yaml.safe_load(f)
+
+    env_override = os.environ.get("NEWTON_CONFIG_OVERRIDE")
+    if env_override:
+        _deep_merge(cfg, json.loads(env_override))
+
     return cfg
 
 

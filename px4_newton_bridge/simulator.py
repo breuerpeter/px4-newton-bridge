@@ -5,6 +5,7 @@ import numpy as np
 import warp as wp
 
 from .builders import BuilderBase
+from .grpc_server import GRPCServer
 from .logging import logger
 from .mavlink_interface import MAVLinkInterface
 from .propeller_basic import (
@@ -30,8 +31,14 @@ class Simulator:
 
         self.vehicle_builder = vehicle_builder
 
-        self.sim_dt = cfg["sim"]["dt"]
+        self.sim_dt = cfg["physics"]["dt"]
         self.sim_time = 0.0
+        self.physics_enabled = cfg["physics"]["enabled"]
+        if not self.physics_enabled:
+            logger.info("Sensor-only mode: physics disabled")
+        self.grpc_server = None
+        if cfg["api"]["enabled"]:
+            self.grpc_server = GRPCServer(cfg["api"]["port"])
 
         self.motor_params = MotorModel()
         self.motor_params.rpm_max = 3800
@@ -66,17 +73,26 @@ class Simulator:
 
         self.capture()
 
-        self.rtf = cfg["sim"].get("rtf", 0)
+        self.rtf = cfg["physics"].get("rtf", 0)
         logger.info(f"Real time factor: {self.rtf}")
         self._step_start_time = time.time()
 
+    def _get_sensor_data(self):
+        """TODO: warp kernel to compute sensor data from sim state."""
+        pass
+
     def capture(self):
-        """Capture CUDA graph for physics substeps only (no I/O)."""
+        """Capture CUDA graph."""
         self.graph = None
         if wp.get_device().is_cuda and wp.is_mempool_enabled(wp.get_device()):
-            logger.info("Using CUDA graph for physics simulation")
-            with wp.ScopedCapture() as capture:
-                self._simulate_physics()
+            logger.info("Using CUDA graph")
+            if self.physics_enabled:
+                with wp.ScopedCapture() as capture:
+                    self._simulate_physics()
+                    self._get_sensor_data()
+            else:
+                with wp.ScopedCapture() as capture:
+                    self._get_sensor_data()
             self.graph = capture.graph
         else:
             logger.info("CUDA graph not available, using standard simulation")
@@ -123,8 +139,47 @@ class Simulator:
         Implements lockstep synchronization with PX4:
         1. Send current sensor data to PX4
         2. Wait (blocking) for actuator controls from PX4
-        3. Run physics with received controls
+        3. Run physics with received controls (or apply pose in sensor-only mode)
         """
+        if not self.physics_enabled and self.grpc_server is not None:
+            self.mav.gps_fix_type = self.grpc_server.gps_fix_type
+
+            pos = self.grpc_server.pos
+            quat = self.grpc_server.quat_xyzw
+            omega = self.grpc_server.omega
+
+            # Integrate angular velocity into orientation
+            speed = wp.length(omega)
+            if speed > 0.0:
+                axis = wp.normalize(omega)
+                angle = speed * self.sim_dt
+                rotation = wp.quat_from_axis_angle(axis, angle)
+                quat = wp.mul(rotation, quat)
+                self.grpc_server.quat_xyzw = quat
+
+            # Tick ChangeAttTo transition
+            transition = self.grpc_server.att_transition
+            if transition is not None:
+                transition["remaining_time"] -= self.sim_dt
+                if transition["remaining_time"] <= 0.0:
+                    self.grpc_server.quat_xyzw = transition["target"]
+                    quat = transition["target"]
+                    self.grpc_server.omega = wp.vec3(0.0, 0.0, 0.0)
+                    self.grpc_server.att_transition = None
+
+            joint_q = self.state0.joint_q.numpy()
+            joint_q[0:7] = wp.transform(pos, quat)
+            self.state0.joint_q.assign(joint_q)
+
+            joint_qd = self.state0.joint_qd.numpy()
+            joint_qd[3:6] = omega
+            self.state0.joint_qd.assign(joint_qd)
+
+            newton.eval_fk(
+                self.model, self.state0.joint_q, self.state0.joint_qd, self.state0
+            )
+            self._body_qd_prev.assign(self.state0.body_qd)
+
         # Step PX4
         self.mav._send_sensor_data(
             self.state0, self._body_qd_prev.numpy(), self.sim_time
@@ -136,18 +191,21 @@ class Simulator:
         # Copy actuator controls to GPU (H2D transfer, cannot be in CUDA graph)
         self.actuator_controls.assign(self.mav.actuator_controls[:4])
 
-        # Run physics (uses CUDA graph if available)
-        if self.graph:
-            wp.capture_launch(self.graph)
-        else:
-            self._simulate_physics()
+        if self.physics_enabled:
+            # Run physics (uses CUDA graph if available)
+            if self.graph:
+                wp.capture_launch(self.graph)
+            else:
+                self._simulate_physics()
 
     def stabilize(self):
         """Step physics with zero actuator inputs until the body settles.
 
-        This should be called before wait_for_px4 so PX4 receives sensor data
+        This should be called before wait_for_px4 so PX4 starts receiving sensor data
         at the resting position rather than at the spawn height.
         """
+        if not self.physics_enabled:
+            return
         for i in range(STABILIZE_MAX_STEPS):
             self._simulate_physics()
             wp.synchronize()

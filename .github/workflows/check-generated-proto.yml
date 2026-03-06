@@ -1,0 +1,28 @@
+name: Check generated proto
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  check-generated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Regenerate proto code
+        run: uv run --no-project --with grpcio-tools python px4_newton_bridge/_generate_proto.py
+
+      - name: Check for differences
+        run: |
+          if ! git diff --exit-code -- newton_api/generated/; then
+            echo "::error::Generated proto code is out of date. Run 'uv run generate-proto' and commit the result."
+            exit 1
+          fi

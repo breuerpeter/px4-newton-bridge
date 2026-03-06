@@ -29,8 +29,9 @@ class MAVLinkInterface:
     def __init__(
         self, cfg: dict, ip: str = "0.0.0.0", sysid: int = 1, compid: int = 200
     ):
-        self.sim_dt = cfg["sim"]["dt"]
+        self.sim_dt = cfg["physics"]["dt"]
         self.rng = random.Random(42)  # deterministic sensor noise
+        self.mag_offset = cfg["sensors"]["mag"]["offset"]
         conn_string = f"tcpin:{ip}:4560"
         logger.info(f"Waiting for PX4 connection on {conn_string}...")
         self.mav = cast(
@@ -53,6 +54,7 @@ class MAVLinkInterface:
         )
 
         self.actuator_controls = [0.0] * self.NUM_ACTUATOR_CHANNELS
+        self.gps_fix_type = 3  # 3D fix by default
 
         self.last_hil_sensor_time = 0.0
         self.last_hil_gps_time = 0.0
@@ -338,9 +340,9 @@ class MAVLinkInterface:
 
         # Rotate to FRD body frame
         mag_body = wp.quat_rotate_inv(quat, mag_world)
-        xmag = mag_body[0] + self.rng.gauss(0, 0.02)
-        ymag = mag_body[1] + self.rng.gauss(0, 0.02)
-        zmag = mag_body[2] + self.rng.gauss(0, 0.03)
+        xmag = mag_body[0] + self.mag_offset[0] + self.rng.gauss(0, 0.02)
+        ymag = mag_body[1] + self.mag_offset[1] + self.rng.gauss(0, 0.02)
+        zmag = mag_body[2] + self.mag_offset[2] + self.rng.gauss(0, 0.03)
 
         # Barometer
         # Approximate pressure from altitude (simplified model)
@@ -395,7 +397,7 @@ class MAVLinkInterface:
 
             vel = int(math.sqrt(vel_linear[0] ** 2 + vel_linear[1] ** 2) * 100)
 
-            self.send_hil_gps(
+            gps_kwargs = dict(
                 time_usec=time_usec,
                 lat=lat,
                 lon=lon,
@@ -405,6 +407,9 @@ class MAVLinkInterface:
                 vd=vd,
                 vel=vel,
             )
+            if self.gps_fix_type < 2:
+                gps_kwargs.update(fix_type=0, eph=9999, satellites_visible=0)
+            self.send_hil_gps(**gps_kwargs)
 
             # Also send full state for visualization/logging
             self.send_hil_state_quaternion(

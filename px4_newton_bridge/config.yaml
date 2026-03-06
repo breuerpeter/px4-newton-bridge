@@ -1,4 +1,11 @@
-sim:
+physics:
+  enabled: true # disabling physics allows manual control over state via API
   dt: 0.004 # [s] (250 Hz, matches Gazebo default)
-  device: null # Warp compute device, e.g. 'cpu', 'cuda:0'. null = auto (prefers GPU).
-  rtf: 0 # Real-time factor. 0 disables throttling.
+  force_cpu: false # if false, GPU is selected if available
+  rtf: 0 # Throttle to this real-time factor. 0 disables throttling.
+api:
+  enabled: false # enable gRPC API for external control
+  port: 4561 # gRPC server port
+sensors:
+  mag:
+    offset: [0.0, 0.0, 0.0] # [Gauss] hard-iron bias added to mag readings

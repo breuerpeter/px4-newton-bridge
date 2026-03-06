@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package newton_api;
+
+service NewtonAPI {
+  rpc SetPose(SetPoseRequest) returns (SetPoseResponse);
+  rpc SetOmega(SetOmegaRequest) returns (SetOmegaResponse);
+  rpc SetGpsFixType(SetGpsFixTypeRequest) returns (SetGpsFixTypeResponse);
+  // Smoothly rotate from current attitude to target over the given duration.
+  // Blocks until the rotation is complete.
+  rpc ChangeAttTo(ChangeAttToRequest) returns (ChangeAttToResponse);
+}
+
+// Set the vehicle pose. NaN values are ignored (current value is kept).
+message SetPoseRequest {
+  repeated double pos = 1;          // [x, y, z] in meters
+  repeated double quat_xyzw = 2;   // [x, y, z, w]
+}
+
+message SetPoseResponse {}
+
+// Set the vehicle angular velocity in world frame [rad/s].
+message SetOmegaRequest {
+  repeated double omega = 1;  // [x, y, z] in rad/s
+}
+
+message SetOmegaResponse {}
+
+message SetGpsFixTypeRequest {
+  int32 fix_type = 1;  // 0 = no fix, 3 = 3D fix
+}
+
+message SetGpsFixTypeResponse {}
+
+// Smoothly rotate to a target attitude over a duration (seconds).
+message ChangeAttToRequest {
+  repeated double quat_xyzw = 1;  // target quaternion [x, y, z, w]
+  double duration = 2;            // rotation time in seconds
+}
+
+message ChangeAttToResponse {}

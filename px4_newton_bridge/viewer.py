@@ -49,7 +49,7 @@ class Viewer(ViewerRerun):
     """
 
     def __init__(self, cfg: dict):
-        self._sim_dt = cfg["sim"]["dt"]
+        self._sim_dt = cfg["physics"]["dt"]
         self._frame_count = 0
         self._last_fps_time = time.time()
         self._fps_interval = 0.5
