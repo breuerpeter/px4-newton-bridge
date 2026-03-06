@@ -4,6 +4,36 @@ from pathlib import Path
 import rerun as rr
 import rerun.blueprint as rrb
 from newton.viewer import ViewerRerun
+from rerun.blueprint.datatypes import TimelineColumn
+
+
+def make_blueprint(*, spatial3d_contents="$origin/**"):
+    """Build the standard PX4 Newton bridge blueprint."""
+    return rrb.Blueprint(
+        rrb.Horizontal(
+            rrb.Vertical(
+                rrb.Spatial3DView(origin="/", contents=spatial3d_contents),
+                rrb.TextDocumentView(origin="status", name="Status"),
+                row_shares=[18, 1],
+            ),
+            rrb.TextLogView(
+                origin="logs",
+                name="Logs",
+                columns=rrb.TextLogColumns(
+                    timeline_columns=[
+                        TimelineColumn("timestamp", visible=False),
+                        TimelineColumn("time", visible=False),
+                        TimelineColumn("log_time", visible=True),
+                        TimelineColumn("log_tick", visible=False),
+                    ],
+                    text_log_columns=["loglevel", "body"],
+                ),
+            ),
+            column_shares=[1.5, 1],
+        ),
+        rrb.TimePanel(state="collapsed"),
+        collapse_panels=True,
+    )
 
 
 class Viewer(ViewerRerun):
@@ -29,21 +59,10 @@ class Viewer(ViewerRerun):
             keep_historical_data=True,
             address="rerun+http://127.0.0.1:9876/proxy",
         )
+        rr.send_blueprint(self._get_blueprint(), make_active=True)
 
     def _get_blueprint(self):
-        return rrb.Blueprint(
-            rrb.Vertical(
-                rrb.Horizontal(
-                    rrb.Spatial3DView(origin="/"),
-                    rrb.TextDocumentView(origin="status", name="Status"),
-                    column_shares=[3, 1],
-                ),
-                rrb.TextLogView(origin="logs", name="Logs"),
-                row_shares=[3, 1],
-            ),
-            rrb.TimePanel(state="collapsed"),
-            collapse_panels=True,
-        )
+        return make_blueprint()
 
     def end_frame(self):
         super().end_frame()
