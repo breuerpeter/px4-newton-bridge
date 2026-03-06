@@ -27,7 +27,6 @@ cleanup() {
     pkill -9 -f 'bin/px4' 2>/dev/null || true
     pkill -9 -f simulator_mavlink 2>/dev/null || true
     pkill -9 -f px4_newton_bridge 2>/dev/null || true
-    pkill -9 -f 'uv run.*px4_newton_bridge' 2>/dev/null || true
     rm -f /tmp/px4_sitl_lockfile-* 2>/dev/null || true
     sleep 2
 }
