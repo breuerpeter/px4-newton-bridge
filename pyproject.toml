@@ -1,0 +1,50 @@
+[build-system]
+requires = ["uv_build>=0.11.0"]
+build-backend = "uv_build"
+
+[project]
+name = "px4-newton-bridge"
+version = "0.1.0"
+description = "PX4 SITL bridge for the Newton physics engine"
+readme = "README.md"
+requires-python = "==3.12.*"
+license = "BSD-3-Clause"
+dependencies = [
+    # Newton
+    "warp-lang>=1.12.0",
+    "mujoco-warp>=3.5.0.2; python_version < '3.14'",
+    "mujoco>=3.5.0; python_version < '3.14'",
+    "trimesh>=4.6.8",
+    "scipy>=1.11.0",
+    "rerun-sdk>=0.30.2",
+
+    # Bridge
+    "pymavlink>=2.4.49",
+    "numpy",
+    "pyyaml>=6.0.2",
+]
+
+[project.optional-dependencies]
+api = [
+    "grpcio>=1.78.0",
+    "protobuf>=6.31.1,<7",
+]
+dev = [
+    "px4-newton-bridge[api]",
+    "grpcio-tools>=1.78.0",
+]
+
+[tool.uv.build-backend]
+module-name = "px4_newton_bridge"
+module-root = ""
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com/"
+explicit = true
+
+[tool.uv.sources]
+warp-lang = { index = "nvidia" }
