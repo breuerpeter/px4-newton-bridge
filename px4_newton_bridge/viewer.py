@@ -62,7 +62,7 @@ class Viewer(ViewerRerun):
         rr.send_blueprint(self._get_blueprint(), make_active=True)
 
     def _get_blueprint(self):
-        return make_blueprint()
+        return make_blueprint(spatial3d_contents=["$origin/**", "- /model/shapes/shape_0"])
 
     def end_frame(self):
         super().end_frame()
