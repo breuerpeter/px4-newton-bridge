@@ -1,7 +1,7 @@
 [submodule "newton"]
 	path = newton
 	url = git@github.com:breuerpeter/newton.git
-	branch = px4
+	branch = feat/recording-id-arg
 [submodule "px4_newton_bridge/vehicles/astro_max/urdf"]
 	path = px4_newton_bridge/vehicles/astro_max/urdf
 	url = git@github.com:freefly-systems/astro_max_urdf.git
