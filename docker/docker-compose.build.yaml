@@ -1,0 +1,5 @@
+services:
+  px4-sitl-newton:
+    build:
+      context: .
+      dockerfile: Dockerfile

@@ -1,0 +1,21 @@
+services:
+  px4-sitl-newton:
+    image: ghcr.io/breuerpeter/px4-newton-bridge/px4-sitl-newton:latest
+    container_name: px4-sitl-newton
+    init: true
+    privileged: true
+    network_mode: host
+    volumes:
+      - ${PX4_DIR:-${HOME}/code/px4}:${PX4_DIR:-${HOME}/code/px4}:rw
+      - warp-cache:/var/cache/warp
+      - venv:/var/cache/venv
+    environment:
+      - WARP_CACHE_PATH=/var/cache/warp
+      - UV_LINK_MODE=copy
+      - NVIDIA_VISIBLE_DEVICES=void
+      - NVIDIA_DRIVER_CAPABILITIES=
+    working_dir: ${PX4_DIR:-${HOME}/code/px4}
+
+volumes:
+  venv:
+  warp-cache:
