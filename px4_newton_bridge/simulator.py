@@ -5,7 +5,6 @@ import numpy as np
 import warp as wp
 
 from .builders import BuilderBase
-from .grpc_server import GRPCServer
 from .logging import logger
 from .mavlink_interface import MAVLinkInterface
 from .propeller_basic import (
@@ -38,6 +37,7 @@ class Simulator:
             logger.info("Sensor-only mode: physics disabled")
         self.grpc_server = None
         if cfg["api"]["enabled"]:
+            from .grpc_server import GRPCServer
             self.grpc_server = GRPCServer(cfg["api"]["port"])
 
         self.motor_params = MotorModel()
