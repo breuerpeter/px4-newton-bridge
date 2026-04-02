@@ -79,7 +79,8 @@ fi
 # --- 4. Run the test ---
 echo "[ci] Running takeoff/land test..."
 set +e
-uvx --with mavsdk python "$PX4_DIR/$BRIDGE_SUBMODULE_PATH/tests/test_takeoff_land.py"
+cd "$PX4_DIR/$BRIDGE_SUBMODULE_PATH"
+uv run --extra test python tests/test_takeoff_land.py
 TEST_EXIT=$?
 set -e
 

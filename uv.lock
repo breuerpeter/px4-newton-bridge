@@ -170,6 +170,26 @@ wheels = [
 ]
 
 [[package]]
+name = "mavsdk"
+version = "3.15.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "grpcio" },
+    { name = "protobuf" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1c/8b/fb30487c6804a79425bb4148481d84201728cf90dceb9886e0ad175dcef1/mavsdk-3.15.3-py3-none-linux_armv6l.whl", hash = "sha256:3b9d35cc2ea7599f78d1a7f73a36d6df44d9df38175ef788b5783bcc0c8dc7c8", size = 16562766, upload-time = "2026-02-11T01:48:55.732Z" },
+    { url = "https://files.pythonhosted.org/packages/79/16/31d2693ef1c084861cfeaa3afe85871a9af95f2b481e05d3209902357bc1/mavsdk-3.15.3-py3-none-linux_armv7l.whl", hash = "sha256:e4dc685d456aa47928bebdfebfcb2fa056bf7f5c6cf5a10f34e77e51b5a6b526", size = 16562720, upload-time = "2026-02-11T01:48:58.441Z" },
+    { url = "https://files.pythonhosted.org/packages/32/b5/81f857ec826c0b8b805ac7d3f4ec8e1dbd926ff318d1f92738e3594bff1d/mavsdk-3.15.3-py3-none-macosx_13_0_x86_64.whl", hash = "sha256:620aa9afcd115be9d118630246bbab2f60f58f596902d01ddaacc3259a13fc79", size = 12258385, upload-time = "2026-02-11T01:50:19.39Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/d1/2074e1dac83c83b1fc65cc4d6e3abcc2101f62059c8640cdb91c08c0c7fd/mavsdk-3.15.3-py3-none-macosx_14_0_arm64.whl", hash = "sha256:d7425842aa240c9a3bbccf7f34af6231c0e034209e54cdc47a790b70f90f705d", size = 11705000, upload-time = "2026-02-11T01:48:59.789Z" },
+    { url = "https://files.pythonhosted.org/packages/f7/9c/b889e9403024b6c8fcfb2012fb96433a1f92877de09c3ae14ea06f162b4f/mavsdk-3.15.3-py3-none-manylinux1_x86_64.manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_5_x86_64.whl", hash = "sha256:ce07022a4a292bb15e1e744abe93980d8338256f76852ca5352e51229017c62f", size = 15193048, upload-time = "2026-02-11T01:49:19.052Z" },
+    { url = "https://files.pythonhosted.org/packages/90/43/8aa26d7439a8b93a325f79de6a9795d3e9e48d138405ec5748a726cd6a08/mavsdk-3.15.3-py3-none-manylinux2014_aarch64.whl", hash = "sha256:18f0db1d017b237564bf25a31933e8ce29d35b5014e8667f05399a2ac4c415b4", size = 18218003, upload-time = "2026-02-11T01:48:59.371Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/d8/266335200bb22021da58eeece232ed9323bf3d514dcfc75cde0b8507ba65/mavsdk-3.15.3-py3-none-win32.whl", hash = "sha256:b08a500236fa814c1f43a86fe3281085918c16c36c3c398ac954631ce0dcbb42", size = 10757785, upload-time = "2026-02-11T01:49:49.987Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/b8/b9220987869d626fe6fe6947ad5a107e18612c69e79f2b7fe1d9a40e629c/mavsdk-3.15.3-py3-none-win_amd64.whl", hash = "sha256:5bfa8fb656b273f90f3d4c4e1ee65c205f3e1af83d8a4d8c7d5cf1f387c3931b", size = 10757785, upload-time = "2026-02-11T01:49:31.69Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/70/4c0d767506aa2bfe21587ba20416b859e23d4230bc469b85e136f0c75c12/mavsdk-3.15.3-py3-none-win_arm64.whl", hash = "sha256:dce986f9672f759fbe8f07c10568fa4111982a4a3da2502331aa79762f164115", size = 10757785, upload-time = "2026-02-11T01:49:56.351Z" },
+]
+
+[[package]]
 name = "mujoco"
 version = "3.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -284,11 +304,15 @@ dev = [
     { name = "grpcio-tools" },
     { name = "protobuf" },
 ]
+test = [
+    { name = "mavsdk" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "grpcio", marker = "extra == 'api'", specifier = ">=1.78.0" },
     { name = "grpcio-tools", marker = "extra == 'dev'", specifier = ">=1.78.0" },
+    { name = "mavsdk", marker = "extra == 'test'" },
     { name = "mujoco", marker = "python_full_version < '3.14'", specifier = ">=3.5.0" },
     { name = "mujoco-warp", marker = "python_full_version < '3.14'", specifier = ">=3.5.0.2" },
     { name = "numpy" },
@@ -301,7 +325,7 @@ requires-dist = [
     { name = "trimesh", specifier = ">=4.6.8" },
     { name = "warp-lang", specifier = ">=1.12.0", index = "https://pypi.nvidia.com/" },
 ]
-provides-extras = ["api", "dev"]
+provides-extras = ["api", "test", "dev"]
 
 [[package]]
 name = "pyarrow"

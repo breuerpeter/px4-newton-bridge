@@ -29,6 +29,9 @@ api = [
     "grpcio>=1.78.0",
     "protobuf>=6.31.1,<7",
 ]
+test = [
+    "mavsdk",
+]
 dev = [
     "px4-newton-bridge[api]",
     "grpcio-tools>=1.78.0",
