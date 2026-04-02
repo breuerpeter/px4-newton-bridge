@@ -2,11 +2,11 @@
 #
 # Run the Newton SITL takeoff/land test natively on a RunPod GPU pod.
 #
-# Usage: run_test_on_pod.sh <commit_sha> <px4_repo_url>
+# Usage: run_test_on_pod.sh <commit_sha>
 #
 # This script is piped via SSH from the GitHub Actions runner.
-# It expects all build tools, MAVSDK, Python 3.11, and uv to be
-# pre-installed (via the CI pod Docker template).
+# It expects the px4-sitl-newton Docker image's dependencies
+# (cmake, ninja, g++, uv, Python) to be pre-installed.
 #
 set -euo pipefail
 
@@ -18,7 +18,6 @@ PX4_DIR="/workspace/px4"
 PX4_TARGET="px4_sitl newton_astro_max"
 PX4_STARTUP_WAIT=20
 PX4_LOG="/tmp/px4_console.log"
-TEST_BUILD_DIR="/tmp/test_build"
 
 cleanup() {
     echo "[ci] Cleaning up..."
@@ -38,11 +37,10 @@ echo "[ci] Commit: $COMMIT_SHA"
 echo "[ci] GPU:    $(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || echo 'unknown')"
 echo "============================================================"
 
-# Rewrite SSH URLs to HTTPS so public submodules clone without SSH keys,
-# and the PAT embedded in PX4_REPO_URL authenticates private repos.
+# Rewrite SSH URLs to HTTPS so public submodules clone without SSH keys
 git config --global url."https://github.com/".insteadOf "git@github.com:"
 
-# --- 1. Clone PX4 repo (private, PAT is embedded in URL) ---
+# --- 1. Clone PX4 repo ---
 echo "[ci] Cloning PX4 firmware..."
 git clone --depth 1 "$PX4_REPO_URL" "$PX4_DIR"
 cd "$PX4_DIR"
@@ -61,15 +59,7 @@ echo "[ci] Setting up Python environment..."
 cd "$PX4_DIR/$BRIDGE_SUBMODULE_PATH"
 uv sync
 
-# --- 3. Build the C++ test binary ---
-echo "[ci] Building C++ test binary..."
-cmake -B "$TEST_BUILD_DIR" -S "$PX4_DIR/$BRIDGE_SUBMODULE_PATH/tests" \
-    -DCMAKE_CXX_COMPILER=clang++ \
-    -DCMAKE_C_COMPILER=clang \
-    -DCMAKE_BUILD_TYPE=Release
-cmake --build "$TEST_BUILD_DIR" -j"$(nproc)"
-
-# --- 4. Start PX4 SITL in background ---
+# --- 3. Start PX4 SITL in background ---
 echo "[ci] Starting PX4 SITL ($PX4_TARGET)..."
 cleanup
 cd "$PX4_DIR"
@@ -86,14 +76,14 @@ if ! kill -0 "$PX4_PID" 2>/dev/null; then
     exit 1
 fi
 
-# --- 5. Run the test ---
+# --- 4. Run the test ---
 echo "[ci] Running takeoff/land test..."
 set +e
-"$TEST_BUILD_DIR/test_takeoff_land"
+uvx --with mavsdk python "$PX4_DIR/$BRIDGE_SUBMODULE_PATH/tests/test_takeoff_land.py"
 TEST_EXIT=$?
 set -e
 
-# --- 6. Show PX4 console output ---
+# --- 5. Show PX4 console output ---
 echo ""
 echo "============================================================"
 echo "PX4 Console Output"
