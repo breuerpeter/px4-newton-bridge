@@ -14,6 +14,17 @@ fi
 
 vehicle="$1"
 
+# Start the Rerun viewer on the host (if not already running)
+if ! command -v rerun >/dev/null 2>&1; then
+    echo "Rerun viewer not found"
+elif pgrep -x rerun >/dev/null 2>&1; then
+    echo "Rerun viewer already running"
+else
+    echo "Starting Rerun viewer..."
+    rerun >/dev/null 2>&1 &
+    disown
+fi
+
 compose_args=(-f "$DOCKER_DIR/docker-compose.yaml")
 if nvidia-smi &>/dev/null; then
     compose_args+=(-f "$DOCKER_DIR/docker-compose.gpu.yaml")
