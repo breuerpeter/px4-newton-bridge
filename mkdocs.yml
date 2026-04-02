@@ -31,3 +31,5 @@ nav:
   - Getting Started:
       - Docker: getting-started/docker.md
       - Local: getting-started/local.md
+  - Contributing:
+      - Documentation: contributing/docs.md
