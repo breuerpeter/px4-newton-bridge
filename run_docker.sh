@@ -7,8 +7,8 @@ DOCKER_DIR="$SCRIPT_DIR/docker"
 PX4_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 
 if [[ $# -eq 0 ]]; then
-    echo "Usage: ./run_sitl.sh <vehicle>"
-    echo "Example: ./run_sitl.sh astro_max"
+    echo "Usage: ./run_docker.sh <vehicle>"
+    echo "Example: ./run_docker.sh astro_max"
     exit 1
 fi
 

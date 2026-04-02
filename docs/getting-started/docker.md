@@ -9,7 +9,7 @@ Run PX4 SITL with the Newton simulator in Docker. No native build dependencies r
 ## Usage
 
 ```bash
-./run_sitl.sh astro_max
+./run_docker.sh astro_max
 ```
 
 The bridge dependencies are installed automatically into a cached virtual environment on the first run.
