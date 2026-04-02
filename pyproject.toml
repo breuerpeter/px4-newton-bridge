@@ -33,6 +33,9 @@ dev = [
     "px4-newton-bridge[api]",
     "grpcio-tools>=1.78.0",
 ]
+docs = [
+    "mkdocs-material",
+]
 
 [tool.uv.build-backend]
 module-name = "px4_newton_bridge"
