@@ -1,4 +1,4 @@
-name: GPU SITL Integration Test
+name: PX4 SITL tests
 
 on:
   push:
