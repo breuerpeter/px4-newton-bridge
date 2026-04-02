@@ -21,15 +21,22 @@ theme:
 
 markdown_extensions:
   - admonition
+  - pymdownx.arithmatex:
+      generic: true
   - pymdownx.highlight
   - pymdownx.superfences
   - pymdownx.tabbed:
       alternate_style: true
+
+extra_javascript:
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 nav:
   - Home: index.md
   - Getting Started:
       - Docker: getting-started/docker.md
       - Local: getting-started/local.md
+  - Vehicles: vehicles.md
+  - Conventions: conventions.md
   - Contributing:
       - Documentation: contributing/docs.md
