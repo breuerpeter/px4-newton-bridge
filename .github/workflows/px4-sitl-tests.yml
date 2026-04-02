@@ -96,7 +96,8 @@ jobs:
           ssh runpod bash -s <<SETUP
           set -euo pipefail
           git config --global url."https://github.com/".insteadOf "git@github.com:"
-          git clone --depth 1 https://github.com/PX4/PX4-Autopilot.git $PX4_DIR
+          # TODO: remove --branch once merged
+          git clone --depth 1 --branch breuerpeter/newton-sim https://github.com/PX4/PX4-Autopilot.git $PX4_DIR
           cd $PX4_DIR
           git submodule update --init --depth 1 $BRIDGE_PATH
           cd $BRIDGE_PATH
