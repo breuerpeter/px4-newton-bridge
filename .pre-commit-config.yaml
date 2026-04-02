@@ -28,3 +28,4 @@ repos:
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
+        args: [--force-scope]
