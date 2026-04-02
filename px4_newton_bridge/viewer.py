@@ -1,5 +1,4 @@
 import time
-from pathlib import Path
 
 import rerun as rr
 import rerun.blueprint as rrb

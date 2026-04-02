@@ -1,8 +1,9 @@
 import time
 
-import newton
 import numpy as np
 import warp as wp
+
+import newton
 
 from .builders import BuilderBase
 from .logging import logger
@@ -26,7 +27,7 @@ class Simulator:
         mavlink_interface: MAVLinkInterface,
         vehicle_builder: BuilderBase,
     ):
-        logger.debug(f"Default device: { wp.get_device() }")
+        logger.debug(f"Default device: {wp.get_device()}")
 
         self.vehicle_builder = vehicle_builder
 
@@ -38,6 +39,7 @@ class Simulator:
         self.grpc_server = None
         if cfg["api"]["enabled"]:
             from .grpc_server import GRPCServer
+
             self.grpc_server = GRPCServer(cfg["api"]["port"])
 
         self.motor_params = MotorModel()
@@ -128,9 +130,7 @@ class Simulator:
             outputs=(self.state0.body_f,),
         )
         self.contacts = self.model.collide(self.state0)
-        self.solver.step(
-            self.state0, self.state1, self.control, self.contacts, self.sim_dt
-        )
+        self.solver.step(self.state0, self.state1, self.control, self.contacts, self.sim_dt)
         self.state0.assign(self.state1)
 
     def simulate(self):
@@ -175,15 +175,11 @@ class Simulator:
             joint_qd[3:6] = omega
             self.state0.joint_qd.assign(joint_qd)
 
-            newton.eval_fk(
-                self.model, self.state0.joint_q, self.state0.joint_qd, self.state0
-            )
+            newton.eval_fk(self.model, self.state0.joint_q, self.state0.joint_qd, self.state0)
             self._body_qd_prev.assign(self.state0.body_qd)
 
         # Step PX4
-        self.mav._send_sensor_data(
-            self.state0, self._body_qd_prev.numpy(), self.sim_time
-        )
+        self.mav._send_sensor_data(self.state0, self._body_qd_prev.numpy(), self.sim_time)
 
         # Block waiting for actuator controls (lockstep synchronization)
         if not self.mav.receive_actuator_controls(timeout=2.0):
@@ -214,14 +210,10 @@ class Simulator:
             linear_vel = np.linalg.norm(body_qd[0, :3])
 
             if i > STABILIZE_MIN_STEPS and linear_vel < STABILIZE_VEL_THRESHOLD:
-                logger.info(
-                    f"Stabilized after {i + 1} steps (vel={linear_vel:.4f} m/s)"
-                )
+                logger.info(f"Stabilized after {i + 1} steps (vel={linear_vel:.4f} m/s)")
                 return
 
-        logger.warning(
-            f"Stabilization did not converge after {STABILIZE_MAX_STEPS} steps (vel={linear_vel:.4f} m/s)"
-        )
+        logger.warning(f"Stabilization did not converge after {STABILIZE_MAX_STEPS} steps (vel={linear_vel:.4f} m/s)")
 
     def step(self):
         # Increment sim_time BEFORE simulate() so sensor data has non-zero timestamps

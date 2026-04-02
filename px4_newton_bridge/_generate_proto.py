@@ -12,7 +12,9 @@ def main():
     out_dir.mkdir(exist_ok=True)
 
     cmd = [
-        sys.executable, "-m", "grpc_tools.protoc",
+        sys.executable,
+        "-m",
+        "grpc_tools.protoc",
         f"--proto_path={proto_dir}",
         f"--python_out={out_dir}",
         f"--grpc_python_out={out_dir}",

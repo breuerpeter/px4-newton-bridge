@@ -1,13 +1,13 @@
 import glob
 
-import newton
 import warp as wp
+
+import newton
 
 from .builder_base import BuilderBase
 
 
 class URDFBuilder(BuilderBase):
-
     def build(self, builder: newton.ModelBuilder) -> None:
         """Build a vehicle model from a URDF file.
 
@@ -17,16 +17,12 @@ class URDFBuilder(BuilderBase):
         urdf_dir = self.vehicle_dir / "urdf"
         urdf_files = glob.glob(str(urdf_dir / "*.urdf"))
         if len(urdf_files) != 1:
-            raise FileNotFoundError(
-                f"Expected exactly one URDF file in {urdf_dir}, found {len(urdf_files)}"
-            )
+            raise FileNotFoundError(f"Expected exactly one URDF file in {urdf_dir}, found {len(urdf_files)}")
 
         builder.add_urdf(
             urdf_files[0],
             # Spawn at 2 m above ground to ensure we do not init in ground
-            xform=wp.transform(
-                wp.vec3(0, 0, 2), wp.quat_from_axis_angle(wp.vec3(1, 0, 0), wp.pi)
-            ),
+            xform=wp.transform(wp.vec3(0, 0, 2), wp.quat_from_axis_angle(wp.vec3(1, 0, 0), wp.pi)),
             floating=True,
             ignore_inertial_definitions=False,
             enable_self_collisions=False,

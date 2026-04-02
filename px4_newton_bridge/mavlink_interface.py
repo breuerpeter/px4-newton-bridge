@@ -1,12 +1,12 @@
 import math
 import os
 import random
-import time
 from typing import cast
 
-import newton
 import numpy as np
 import warp as wp
+
+import newton
 
 # Set MAVLink dialect before importing mavutil
 os.environ["MAVLINK20"] = "1"
@@ -22,13 +22,9 @@ class MAVLinkInterface:
     """Handles MAVLink communication with a PX4 SITL instance."""
 
     _hil_act_msg = mavutil.mavlink.MAVLink_hil_actuator_controls_message
-    NUM_ACTUATOR_CHANNELS = _hil_act_msg.array_lengths[
-        _hil_act_msg.ordered_fieldnames.index("controls")
-    ]
+    NUM_ACTUATOR_CHANNELS = _hil_act_msg.array_lengths[_hil_act_msg.ordered_fieldnames.index("controls")]
 
-    def __init__(
-        self, cfg: dict, ip: str = "0.0.0.0", sysid: int = 1, compid: int = 200
-    ):
+    def __init__(self, cfg: dict, ip: str = "0.0.0.0", sysid: int = 1, compid: int = 200):
         self.sim_dt = cfg["physics"]["dt"]
         self.rng = random.Random(42)  # deterministic sensor noise
         self.mag_offset = cfg["sensors"]["mag"]["offset"]
@@ -198,7 +194,7 @@ class MAVLinkInterface:
     def send_hil_state_quaternion(
         self,
         time_usec: int,
-        attitude_quaternion: list = [1.0, 0.0, 0.0, 0.0],
+        attitude_quaternion: list | None = None,
         rollspeed: float = 0.0,
         pitchspeed: float = 0.0,
         yawspeed: float = 0.0,
@@ -227,6 +223,8 @@ class MAVLinkInterface:
             ind_airspeed, true_airspeed: Airspeed [cm/s]
             xacc, yacc, zacc: Acceleration [mG]
         """
+        if attitude_quaternion is None:
+            attitude_quaternion = [1.0, 0.0, 0.0, 0.0]
 
         self.proto.hil_state_quaternion_send(
             time_usec,
@@ -258,9 +256,7 @@ class MAVLinkInterface:
                 logger.info("PX4 lockstep established")
                 return sim_time
 
-    def _send_sensor_data(
-        self, current_state: newton.State, body_qd_prev: np.ndarray, sim_time: float
-    ):
+    def _send_sensor_data(self, current_state: newton.State, body_qd_prev: np.ndarray, sim_time: float):
         """Send simulated sensor data to PX4."""
         time_usec = int(sim_time * 1e6)
 
@@ -269,7 +265,6 @@ class MAVLinkInterface:
         # body_qd contains linear and angular velocity for each body
         body_q = current_state.body_q.numpy()
         body_qd = current_state.body_qd.numpy()
-        body_qd_prev = body_qd_prev
 
         # Extract vehicle state (body index 0)
         # Position: [x, y, z]
@@ -303,9 +298,7 @@ class MAVLinkInterface:
         gravity_body = wp.quat_rotate_inv(quat, gravity_world)
 
         # Linear acceleration in world frame, transform to body frame
-        acc_world = wp.vec3(
-            float(acc_linear[0]), float(acc_linear[1]), float(acc_linear[2])
-        )
+        acc_world = wp.vec3(float(acc_linear[0]), float(acc_linear[1]), float(acc_linear[2]))
         acc_body = wp.quat_rotate_inv(quat, acc_world)
 
         # Accelerometer = specific force = acceleration - gravity (FRD body frame)
@@ -327,13 +320,9 @@ class MAVLinkInterface:
 
         # Construct magnetic field in NED frame
         # mag_ned = Dcm(Euler(0, -inclination, declination)) * [H, 0, 0]
-        mag_n = (
-            field_strength_gauss * math.cos(declination_rad) * math.cos(inclination_rad)
-        )
+        mag_n = field_strength_gauss * math.cos(declination_rad) * math.cos(inclination_rad)
         mag_e = field_strength_gauss * math.sin(declination_rad)
-        mag_d = (
-            field_strength_gauss * math.cos(declination_rad) * math.sin(inclination_rad)
-        )
+        mag_d = field_strength_gauss * math.cos(declination_rad) * math.sin(inclination_rad)
 
         # Convert NED to Newton world frame (X=North, Y=East, Z=Up)
         mag_world = wp.vec3(mag_n, mag_e, -mag_d)
@@ -349,9 +338,7 @@ class MAVLinkInterface:
         altitude = pos[2]  # z is up in simulation
         sea_level_pressure = 1013.25  # hPa
         # Barometric formula approximation
-        abs_pressure = sea_level_pressure * (
-            1 - 2.25577e-5 * altitude
-        ) ** 5.25588 + self.rng.gauss(0, 0.02)
+        abs_pressure = sea_level_pressure * (1 - 2.25577e-5 * altitude) ** 5.25588 + self.rng.gauss(0, 0.02)
         pressure_alt = altitude + self.rng.gauss(0, 0.02)
 
         # Send HIL_SENSOR at simulation rate
@@ -397,16 +384,16 @@ class MAVLinkInterface:
 
             vel = int(math.sqrt(vel_linear[0] ** 2 + vel_linear[1] ** 2) * 100)
 
-            gps_kwargs = dict(
-                time_usec=time_usec,
-                lat=lat,
-                lon=lon,
-                alt=alt,
-                vn=vn,
-                ve=ve,
-                vd=vd,
-                vel=vel,
-            )
+            gps_kwargs = {
+                "time_usec": time_usec,
+                "lat": lat,
+                "lon": lon,
+                "alt": alt,
+                "vn": vn,
+                "ve": ve,
+                "vd": vd,
+                "vel": vel,
+            }
             if self.gps_fix_type < 2:
                 gps_kwargs.update(fix_type=0, eph=9999, satellites_visible=0)
             self.send_hil_gps(**gps_kwargs)

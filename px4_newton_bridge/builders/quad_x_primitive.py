@@ -1,7 +1,8 @@
 import math
 
-import newton
 import warp as wp
+
+import newton
 
 from .builder_base import BuilderBase
 
@@ -80,9 +81,7 @@ class QuadXPrimitive(BuilderBase):
         diagonal_boom = self.body_diagonal_xy + boom_half_length - boom_radius
 
         # Landing gear tilt: splay outward in +Z (downward in FRD)
-        lnd_gear_rot_y = wp.quat_from_axis_angle(
-            wp.vec3(0, 1, 0), self.lnd_gear_angle_rad
-        )
+        lnd_gear_rot_y = wp.quat_from_axis_angle(wp.vec3(0, 1, 0), self.lnd_gear_angle_rad)
 
         # Central body
         builder.add_shape_box(

@@ -46,9 +46,7 @@ class NewtonClient:
 
     def set_gps_fix_type(self, fix_type: int):
         """Set the GPS fix type (0 = no fix, 3 = 3D fix)."""
-        self.stub.SetGpsFixType(
-            newton_api_pb2.SetGpsFixTypeRequest(fix_type=fix_type)
-        )
+        self.stub.SetGpsFixType(newton_api_pb2.SetGpsFixTypeRequest(fix_type=fix_type))
 
     def change_att_to(self, quat_xyzw: list[float], duration: float):
         """Smoothly rotate to target attitude over duration seconds.
@@ -61,9 +59,7 @@ class NewtonClient:
             quat_xyzw: Target quaternion as [x, y, z, w].
             duration: Rotation time in seconds.
         """
-        self.stub.ChangeAttTo(
-            newton_api_pb2.ChangeAttToRequest(quat_xyzw=quat_xyzw, duration=duration)
-        )
+        self.stub.ChangeAttTo(newton_api_pb2.ChangeAttToRequest(quat_xyzw=quat_xyzw, duration=duration))
 
     def close(self):
         self.channel.close()

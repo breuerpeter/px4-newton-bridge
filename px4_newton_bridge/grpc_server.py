@@ -5,6 +5,7 @@ from concurrent import futures
 
 import grpc
 import warp as wp
+
 from newton_api.generated import newton_api_pb2, newton_api_pb2_grpc
 
 from .logging import logger
@@ -49,9 +50,7 @@ class _NewtonAPIServicer(newton_api_pb2_grpc.NewtonAPIServicer):
         if len(request.quat_xyzw) > 0:
             if len(request.quat_xyzw) != 4:
                 context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                context.set_details(
-                    "quat_xyzw must have exactly 4 elements [x, y, z, w]"
-                )
+                context.set_details("quat_xyzw must have exactly 4 elements [x, y, z, w]")
                 return newton_api_pb2.SetPoseResponse()
             if not any(math.isnan(v) for v in request.quat_xyzw):
                 x, y, z, w = request.quat_xyzw
@@ -115,9 +114,7 @@ class GRPCServer:
         self.att_transition = None  # active ChangeAttTo rotation
 
         self._grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=2))
-        newton_api_pb2_grpc.add_NewtonAPIServicer_to_server(
-            _NewtonAPIServicer(self), self._grpc_server
-        )
+        newton_api_pb2_grpc.add_NewtonAPIServicer_to_server(_NewtonAPIServicer(self), self._grpc_server)
         self._grpc_server.add_insecure_port(f"0.0.0.0:{port}")
         self._grpc_server.start()
         logger.info(f"Listening on port {port}")
