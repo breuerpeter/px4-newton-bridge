@@ -39,4 +39,5 @@ nav:
   - Vehicles: vehicles.md
   - Conventions: conventions.md
   - Contributing:
+      - Development: contributing/development.md
       - Documentation: contributing/docs.md

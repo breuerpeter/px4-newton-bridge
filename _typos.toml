@@ -1,0 +1,8 @@
+[default.extend-words]
+# PX4 / aviation domain terms
+SITL = "SITL"
+sitl = "sitl"
+NED = "NED"
+ned = "ned"
+# Python package name
+empy = "empy"
