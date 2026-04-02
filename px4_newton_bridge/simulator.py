@@ -186,7 +186,8 @@ class Simulator:
         )
 
         # Block waiting for actuator controls (lockstep synchronization)
-        self.mav.receive_actuator_controls(timeout=None)
+        if not self.mav.receive_actuator_controls(timeout=2.0):
+            raise ConnectionError("PX4 disconnected (no actuator controls received)")
 
         # Copy actuator controls to GPU (H2D transfer, cannot be in CUDA graph)
         self.actuator_controls.assign(self.mav.actuator_controls[:4])

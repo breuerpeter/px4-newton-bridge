@@ -3,6 +3,7 @@ import argparse
 import warp as wp
 
 from . import get_cfg, load_model
+from .logging import logger
 from .mavlink_interface import MAVLinkInterface
 from .simulator import Simulator
 from .viewer import Viewer
@@ -34,12 +35,15 @@ def main():
     sim.stabilize()
     sim.sim_time = mav.wait_for_px4(sim.state0, sim._body_qd_prev.numpy())
 
-    while viewer.is_running():
-        if not viewer.is_paused():
-            sim.step()
-        viewer.begin_frame(sim.sim_time)
-        viewer.log_state(sim.state0)
-        viewer.end_frame()
+    try:
+        while viewer.is_running():
+            if not viewer.is_paused():
+                sim.step()
+            viewer.begin_frame(sim.sim_time)
+            viewer.log_state(sim.state0)
+            viewer.end_frame()
+    except ConnectionError as e:
+        logger.info(e)
 
     viewer.close()
 
