@@ -10,6 +10,8 @@ concurrency:
 
 env:
   RUNPOD_GPU_TYPE: "NVIDIA RTX 4000 Ada Generation"
+  PX4_DIR: /workspace/px4
+  BRIDGE_PATH: Tools/simulation/newton/px4-newton-bridge
 
 jobs:
   gpu-test:
@@ -88,15 +90,26 @@ jobs:
             UserKnownHostsFile /dev/null
           EOF
 
-      - name: Run SITL test on pod
+      - name: Clone PX4 and bridge on pod
+        run: |
+          sleep 5
+          ssh runpod bash -s <<SETUP
+          set -euo pipefail
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git clone --depth 1 https://github.com/PX4/PX4-Autopilot.git $PX4_DIR
+          cd $PX4_DIR
+          git submodule update --init --depth 1 $BRIDGE_PATH
+          cd $BRIDGE_PATH
+          git fetch origin ${{ github.sha }}
+          git checkout ${{ github.sha }}
+          git submodule update --init --recursive
+          SETUP
+
+      - name: Run SITL tests on pod
         id: test
         run: |
-          # Wait a few seconds for SSH daemon to fully initialize
-          sleep 5
-
-          ssh runpod "bash -s" -- \
-            "${{ github.sha }}" \
-            < .github/scripts/run_test_on_pod.sh 2>&1 | tee test_output.log
+          ssh runpod "$PX4_DIR/$BRIDGE_PATH/scripts/run_px4_sitl_tests.sh $PX4_DIR" \
+            2>&1 | tee test_output.log
 
           echo "test_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
