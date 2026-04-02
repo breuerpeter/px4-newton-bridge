@@ -10,8 +10,8 @@
 #
 set -euo pipefail
 
-COMMIT_SHA="${1:?Usage: $0 <commit_sha> <px4_repo_url>}"
-PX4_REPO_URL="${2:?Usage: $0 <commit_sha> <px4_repo_url>}"
+COMMIT_SHA="${1:?Usage: $0 <commit_sha>}"
+PX4_REPO_URL="https://github.com/PX4/PX4-Autopilot.git"
 
 BRIDGE_SUBMODULE_PATH="Tools/simulation/newton/px4-newton-bridge"
 PX4_DIR="/workspace/px4"

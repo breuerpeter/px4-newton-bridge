@@ -96,7 +96,6 @@ jobs:
 
           ssh runpod "bash -s" -- \
             "${{ github.sha }}" \
-            "${{ secrets.PX4_REPO_URL }}" \
             < .github/scripts/run_test_on_pod.sh 2>&1 | tee test_output.log
 
           echo "test_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
