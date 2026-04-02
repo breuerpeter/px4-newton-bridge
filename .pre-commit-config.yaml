@@ -1,3 +1,15 @@
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto code formatting
+  autofix_prs: false
+  autoupdate_schedule: quarterly
+  submodules: false
+  # pre-commit.ci has no network access, but uv-lock needs to resolve
+  # dependencies from remote indexes (PyPI, nvidia).
+  # Lockfile freshness is checked by a separate CI workflow instead.
+  skip:
+    - uv-lock
+
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
