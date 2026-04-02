@@ -1,0 +1,37 @@
+name: Bug Report
+description: Create a report to help us improve PX4-Newton Bridge.
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: textarea
+    attributes:
+      label: Bug Description
+      description: >-
+        Describe the bug. What happened, and what did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction Steps
+      description: >-
+        Minimal steps to reproduce the issue. Include the command you ran
+        (e.g. `./run_docker.sh astro_max` or `make px4_sitl_newton newton_astro_max`).
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: System Information
+      description: >-
+        PX4 branch, Python version, OS, and GPU (if relevant).
+      placeholder: |
+        - PX4 branch: freefly-develop
+        - Python: 3.12
+        - OS: Ubuntu 24.04
+        - GPU: NVIDIA RTX ...
+        - Docker: yes / no
+    validations:
+      required: false
