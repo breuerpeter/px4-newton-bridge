@@ -252,7 +252,7 @@ class MAVLinkInterface:
         while True:
             sim_time += self.sim_dt
             self._send_sensor_data(current_state, body_qd_prev, sim_time)
-            if self.receive_actuator_controls(timeout=1.0):
+            if self.receive_actuator_controls(timeout=0.05):
                 logger.info("PX4 lockstep established")
                 return sim_time
 

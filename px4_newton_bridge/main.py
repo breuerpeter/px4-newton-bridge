@@ -28,17 +28,17 @@ def main():
         wp.set_device("cpu")
 
     viewer = Viewer(cfg)
-    mav = MAVLinkInterface(cfg)
-    sim = Simulator(cfg, mav, load_model(args.vehicle))
+    sim = Simulator(cfg, load_model(args.vehicle))
     viewer.set_model(sim.model)
 
     sim.stabilize()
+    mav = MAVLinkInterface(cfg)
     sim.sim_time = mav.wait_for_px4(sim.state0, sim._body_qd_prev.numpy())
 
     try:
         while viewer.is_running():
             if not viewer.is_paused():
-                sim.step()
+                sim.step(mav)
             viewer.begin_frame(sim.sim_time)
             viewer.log_state(sim.state0)
             viewer.end_frame()

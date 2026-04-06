@@ -24,7 +24,6 @@ class Simulator:
     def __init__(
         self,
         cfg: dict,
-        mavlink_interface: MAVLinkInterface,
         vehicle_builder: BuilderBase,
     ):
         logger.debug(f"Default device: {wp.get_device()}")
@@ -51,8 +50,6 @@ class Simulator:
 
         self.rpms = wp.zeros(4)
         self.actuator_controls = wp.zeros(4)
-
-        self.mav = mavlink_interface
 
         builder = newton.ModelBuilder()
         builder.add_ground_plane()
@@ -133,7 +130,7 @@ class Simulator:
         self.solver.step(self.state0, self.state1, self.control, self.contacts, self.sim_dt)
         self.state0.assign(self.state1)
 
-    def simulate(self):
+    def simulate(self, mav: MAVLinkInterface):
         """Full simulation step including MAVLink I/O and physics.
 
         Implements lockstep synchronization with PX4:
@@ -142,7 +139,7 @@ class Simulator:
         3. Run physics with received controls (or apply pose in sensor-only mode)
         """
         if not self.physics_enabled and self.grpc_server is not None:
-            self.mav.gps_fix_type = self.grpc_server.gps_fix_type
+            mav.gps_fix_type = self.grpc_server.gps_fix_type
 
             pos = self.grpc_server.pos
             quat = self.grpc_server.quat_xyzw
@@ -179,14 +176,14 @@ class Simulator:
             self._body_qd_prev.assign(self.state0.body_qd)
 
         # Step PX4
-        self.mav._send_sensor_data(self.state0, self._body_qd_prev.numpy(), self.sim_time)
+        mav._send_sensor_data(self.state0, self._body_qd_prev.numpy(), self.sim_time)
 
         # Block waiting for actuator controls (lockstep synchronization)
-        if not self.mav.receive_actuator_controls(timeout=2.0):
+        if not mav.receive_actuator_controls(timeout=2.0):
             raise ConnectionError("PX4 disconnected (no actuator controls received)")
 
         # Copy actuator controls to GPU (H2D transfer, cannot be in CUDA graph)
-        self.actuator_controls.assign(self.mav.actuator_controls[:4])
+        self.actuator_controls.assign(mav.actuator_controls[:4])
 
         if self.physics_enabled:
             # Run physics (uses CUDA graph if available)
@@ -215,12 +212,12 @@ class Simulator:
 
         logger.warning(f"Stabilization did not converge after {STABILIZE_MAX_STEPS} steps (vel={linear_vel:.4f} m/s)")
 
-    def step(self):
+    def step(self, mav: MAVLinkInterface):
         # Increment sim_time BEFORE simulate() so sensor data has non-zero timestamps
         self.sim_time += self.sim_dt
 
         # simulate() handles I/O and physics (with CUDA graph if available)
-        self.simulate()
+        self.simulate(mav)
 
         if self.rtf > 0:
             step_time = time.time() - self._step_start_time
