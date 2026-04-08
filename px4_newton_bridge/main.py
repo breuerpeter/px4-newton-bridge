@@ -33,6 +33,8 @@ def main():
 
     sim.stabilize()
     mav = MAVLinkInterface(cfg)
+    if sim.ref_alt is not None:
+        mav.ref_alt = sim.ref_alt
     sim.sim_time = mav.wait_for_px4(sim.state0, sim._body_qd_prev.numpy())
 
     try:

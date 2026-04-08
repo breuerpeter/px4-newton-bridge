@@ -55,9 +55,10 @@ class Simulator:
         builder = newton.ModelBuilder()
         builder.add_ground_plane()
 
+        self.ref_alt = None
         terrain_cfg = cfg.get("terrain", {})
         if terrain_cfg.get("enabled", False):
-            self._add_terrain(builder, cfg)
+            self.ref_alt = self._add_terrain(builder, cfg)
 
         self.vehicle_builder.build(builder)
         self.model = builder.finalize()
@@ -83,11 +84,11 @@ class Simulator:
         self._step_start_time = time.time()
 
     @staticmethod
-    def _add_terrain(builder: newton.ModelBuilder, cfg: dict) -> None:
+    def _add_terrain(builder: newton.ModelBuilder, cfg: dict) -> float:
         from terrain_fetcher import Terrain
 
         gps = cfg["sensors"]["gps"]["init"]
-        ref_lat, ref_lon, ref_alt = gps["lat"], gps["lon"], gps["alt"]
+        ref_lat, ref_lon = gps["lat"], gps["lon"]
 
         half_n = cfg["terrain"]["half_lengths"]["north"]
         half_e = cfg["terrain"]["half_lengths"]["east"]
@@ -98,7 +99,6 @@ class Simulator:
         terrain = Terrain(
             ref_lat=ref_lat,
             ref_lon=ref_lon,
-            ref_alt=ref_alt,
             lat_min=ref_lat - half_n * deg_per_m_lat,
             lat_max=ref_lat + half_n * deg_per_m_lat,
             lon_min=ref_lon - half_e * deg_per_m_lon,
@@ -129,6 +129,7 @@ class Simulator:
         )
         builder.add_shape_mesh(body=-1, mesh=mesh)
         logger.info(f"Terrain mesh added: {len(terrain.vertices)} vertices, {len(terrain.indices)} triangles")
+        return terrain.ref_alt_wgs84
 
     def _get_sensor_data(self):
         """TODO: warp kernel to compute sensor data from sim state."""
