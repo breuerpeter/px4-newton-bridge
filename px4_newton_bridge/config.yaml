@@ -6,6 +6,11 @@ physics:
 api:
   enabled: false # enable gRPC API for external control
   port: 4561 # gRPC server port
+terrain:
+  enabled: true
+  half_lengths:
+    north: 50 # [m]
+    east: 50 # [m]
 sensors:
   gps:
     init:

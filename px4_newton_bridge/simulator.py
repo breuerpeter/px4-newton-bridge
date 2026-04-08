@@ -1,3 +1,4 @@
+import math
 import time
 
 import numpy as np
@@ -53,6 +54,11 @@ class Simulator:
 
         builder = newton.ModelBuilder()
         builder.add_ground_plane()
+
+        terrain_cfg = cfg.get("terrain", {})
+        if terrain_cfg.get("enabled", False):
+            self._add_terrain(builder, cfg)
+
         self.vehicle_builder.build(builder)
         self.model = builder.finalize()
         self.vehicle_builder.model_debug_print(self.model)
@@ -75,6 +81,54 @@ class Simulator:
         self.rtf = cfg["physics"].get("rtf", 0)
         logger.info(f"Real time factor: {self.rtf}")
         self._step_start_time = time.time()
+
+    @staticmethod
+    def _add_terrain(builder: newton.ModelBuilder, cfg: dict) -> None:
+        from terrain_fetcher import Terrain
+
+        gps = cfg["sensors"]["gps"]["init"]
+        ref_lat, ref_lon, ref_alt = gps["lat"], gps["lon"], gps["alt"]
+
+        half_n = cfg["terrain"]["half_lengths"]["north"]
+        half_e = cfg["terrain"]["half_lengths"]["east"]
+
+        deg_per_m_lat = 1.0 / 111_000.0
+        deg_per_m_lon = deg_per_m_lat / math.cos(math.radians(ref_lat))
+
+        terrain = Terrain(
+            ref_lat=ref_lat,
+            ref_lon=ref_lon,
+            ref_alt=ref_alt,
+            lat_min=ref_lat - half_n * deg_per_m_lat,
+            lat_max=ref_lat + half_n * deg_per_m_lat,
+            lon_min=ref_lon - half_e * deg_per_m_lon,
+            lon_max=ref_lon + half_e * deg_per_m_lon,
+        )
+
+        # Warp Texture2D requires 1, 2, or 4 channels; convert RGB -> RGBA
+        texture_rgba = np.concatenate(
+            [
+                terrain.texture_rgb,
+                np.full(
+                    (
+                        *terrain.texture_rgb.shape[:2],
+                        1,
+                    ),
+                    255,
+                    dtype=np.uint8,
+                ),
+            ],
+            axis=2,
+        )
+        mesh = newton.Mesh(
+            terrain.vertices,
+            terrain.indices.ravel(),
+            uvs=terrain.uvs,
+            texture=texture_rgba,
+            compute_inertia=False,
+        )
+        builder.add_shape_mesh(body=-1, mesh=mesh)
+        logger.info(f"Terrain mesh added: {len(terrain.vertices)} vertices, {len(terrain.indices)} triangles")
 
     def _get_sensor_data(self):
         """TODO: warp kernel to compute sensor data from sim state."""

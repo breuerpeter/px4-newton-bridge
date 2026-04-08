@@ -22,6 +22,8 @@ dependencies = [
     "pymavlink>=2.4.49",
     "numpy",
     "pyyaml>=6.0.2",
+
+    "terrain-fetcher",
 ]
 
 [project.optional-dependencies]
@@ -80,3 +82,4 @@ explicit = true
 
 [tool.uv.sources]
 warp-lang = { index = "nvidia" }
+terrain-fetcher = { path = "terrain-fetcher", editable = true }

@@ -5,3 +5,6 @@
 [submodule "px4_newton_bridge/vehicles/astro_max/urdf"]
 	path = px4_newton_bridge/vehicles/astro_max/urdf
 	url = git@github.com:freefly-systems/astro_max_urdf.git
+[submodule "terrain-fetcher"]
+	path = terrain-fetcher
+	url = git@github.com:breuerpeter/terrain-fetcher.git
