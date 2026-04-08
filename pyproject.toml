@@ -23,6 +23,8 @@ dependencies = [
     "numpy",
     "pyyaml>=6.0.2",
 
+    # Submodules
+    "newton",
     "terrain-fetcher",
 ]
 
@@ -82,4 +84,5 @@ explicit = true
 
 [tool.uv.sources]
 warp-lang = { index = "nvidia" }
+newton = { path = "newton", editable = true }
 terrain-fetcher = { path = "terrain-fetcher", editable = true }

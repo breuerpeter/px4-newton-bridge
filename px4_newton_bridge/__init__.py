@@ -3,12 +3,6 @@
 import json
 import os
 import pathlib
-import sys
-
-# Ensure the newton submodule is importable
-_NEWTON_DIR = str(pathlib.Path(__file__).resolve().parent.parent / "newton")
-if _NEWTON_DIR not in sys.path:
-    sys.path.insert(0, _NEWTON_DIR)
 
 import yaml
 
