@@ -3,6 +3,7 @@ import time
 
 import numpy as np
 import warp as wp
+from newton.sensors import SensorTiledCamera
 
 import newton
 
@@ -83,6 +84,14 @@ class Simulator:
         logger.info(f"Real time factor: {self.rtf}")
         self._step_start_time = time.time()
 
+        # Camera sensor (optional, configured per-vehicle)
+        self._camera = None
+        self._camera_color = None
+        self._camera_depth = None
+        cam_cfg = vehicle_builder.cfg.get("camera")
+        if cam_cfg:
+            self._init_camera(cam_cfg)
+
     @staticmethod
     def _add_terrain(builder: newton.ModelBuilder, cfg: dict) -> float:
         from terrain_fetcher import Terrain
@@ -134,6 +143,97 @@ class Simulator:
     def _get_sensor_data(self):
         """TODO: warp kernel to compute sensor data from sim state."""
         pass
+
+    def _init_camera(self, cam_cfg: dict) -> None:
+        """Initialize the tiled camera sensor from vehicle camera config."""
+        self._cam_width = cam_cfg.get("width", 320)
+        self._cam_height = cam_cfg.get("height", 240)
+        fov_deg = cam_cfg.get("fov", 90)
+        rate = cam_cfg.get("rate", 30)
+        self._cam_step_interval = max(1, round(1.0 / (rate * self.sim_dt)))
+
+        # Body-relative camera pose (FRD body frame)
+        pos = cam_cfg.get("position", [0.0, 0.0, 0.0])
+        rpy_deg = cam_cfg.get("orientation_rpy", [0.0, 0.0, 0.0])
+        rpy_rad = [math.radians(a) for a in rpy_deg]
+
+        # Build body-relative transform: RPY -> quaternion (intrinsic XYZ)
+        qx = wp.quat_from_axis_angle(wp.vec3(1, 0, 0), rpy_rad[0])
+        qy = wp.quat_from_axis_angle(wp.vec3(0, 1, 0), rpy_rad[1])
+        qz = wp.quat_from_axis_angle(wp.vec3(0, 0, 1), rpy_rad[2])
+        q_body = wp.mul(wp.mul(qz, qy), qx)
+        self._cam_body_offset = wp.transform(wp.vec3(*pos), q_body)
+
+        self._camera = SensorTiledCamera(
+            model=self.model,
+            config=SensorTiledCamera.RenderConfig(enable_textures=True),
+        )
+        self._camera.utils.create_default_light(enable_shadows=True)
+
+        self._cam_rays = self._camera.utils.compute_pinhole_camera_rays(
+            self._cam_width, self._cam_height, math.radians(fov_deg)
+        )
+        self._camera_color = self._camera.utils.create_color_image_output(self._cam_width, self._cam_height)
+        self._camera_depth = self._camera.utils.create_depth_image_output(self._cam_width, self._cam_height)
+        self._cam_step_counter = 0
+        self._cam_images_dirty = False
+
+        logger.info(
+            f"Camera sensor: {self._cam_width}x{self._cam_height} @ {rate} Hz "
+            f"(every {self._cam_step_interval} steps), FOV {fov_deg}°"
+        )
+
+    def _get_camera_world_transform(self) -> wp.transformf:
+        """Compute camera world-space transform from body pose and offset."""
+        body_q = self.state0.body_q.numpy()[0]
+        body_pos = wp.vec3(float(body_q[0]), float(body_q[1]), float(body_q[2]))
+        body_rot = wp.quat(float(body_q[3]), float(body_q[4]), float(body_q[5]), float(body_q[6]))
+        body_tf = wp.transform(body_pos, body_rot)
+        return wp.transform_multiply(body_tf, self._cam_body_offset)
+
+    def update_camera(self) -> bool:
+        """Render camera if due. Returns True if new images are available."""
+        if self._camera is None:
+            return False
+
+        self._cam_step_counter += 1
+        if self._cam_step_counter < self._cam_step_interval:
+            return False
+        self._cam_step_counter = 0
+
+        cam_tf = self._get_camera_world_transform()
+        # camera_transforms shape: (camera_count=1, world_count=1)
+        cam_transforms = wp.array([[cam_tf]], dtype=wp.transformf)
+
+        self._camera.update(
+            self.state0,
+            cam_transforms,
+            self._cam_rays,
+            color_image=self._camera_color,
+            depth_image=self._camera_depth,
+        )
+        self._cam_images_dirty = True
+        return True
+
+    def get_camera_images(self) -> tuple[np.ndarray, np.ndarray] | None:
+        """Return (rgb, depth) numpy arrays if new images are available.
+
+        RGB is uint8 (H, W, 3), depth is float32 (H, W) in meters.
+        Returns None if no new images since last call.
+        """
+        if not self._cam_images_dirty:
+            return None
+        self._cam_images_dirty = False
+
+        # color: (world=1, cam=1, H, W) uint32 RGBA -> (H, W, 3) uint8
+        color_np = self._camera_color.numpy()[0, 0]
+        rgba = color_np.view(np.uint8).reshape(self._cam_height, self._cam_width, 4)
+        rgb = rgba[:, :, :3]
+
+        # depth: (world=1, cam=1, H, W) float32 -> (H, W)
+        depth = self._camera_depth.numpy()[0, 0]
+
+        return rgb, depth
 
     def capture(self):
         """Capture CUDA graph."""

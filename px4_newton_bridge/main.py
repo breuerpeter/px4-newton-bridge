@@ -41,8 +41,12 @@ def main():
         while viewer.is_running():
             if not viewer.is_paused():
                 sim.step(mav)
+                sim.update_camera()
             viewer.begin_frame(sim.sim_time)
             viewer.log_state(sim.state0)
+            images = sim.get_camera_images()
+            if images is not None:
+                viewer.log_camera_images(*images)
             viewer.end_frame()
     except ConnectionError as e:
         logger.info(e)

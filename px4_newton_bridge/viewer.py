@@ -1,5 +1,6 @@
 import time
 
+import numpy as np
 import rerun as rr
 import rerun.blueprint as rrb
 from newton.viewer import ViewerRerun
@@ -15,6 +16,10 @@ def make_blueprint(*, spatial3d_contents="$origin/**"):
                 rrb.TextDocumentView(origin="status", name="Status"),
                 row_shares=[18, 1],
             ),
+            rrb.Vertical(
+                rrb.Spatial2DView(origin="camera/rgb", name="RGB"),
+                rrb.Spatial2DView(origin="camera/depth", name="Depth"),
+            ),
             rrb.TextLogView(
                 origin="logs",
                 name="Logs",
@@ -28,7 +33,7 @@ def make_blueprint(*, spatial3d_contents="$origin/**"):
                     text_log_columns=["loglevel", "body"],
                 ),
             ),
-            column_shares=[1.5, 1],
+            column_shares=[1.5, 1, 1],
         ),
         rrb.TimePanel(state="collapsed"),
         collapse_panels=True,
@@ -62,6 +67,11 @@ class Viewer(ViewerRerun):
 
     def _get_blueprint(self):
         return make_blueprint(spatial3d_contents=["$origin/**", "- /model/shapes/shape_0"])
+
+    def log_camera_images(self, rgb: np.ndarray, depth: np.ndarray) -> None:
+        """Log RGB and depth camera images to Rerun."""
+        rr.log("camera/rgb", rr.Image(rgb))
+        rr.log("camera/depth", rr.DepthImage(depth, meter=1.0))
 
     def end_frame(self):
         super().end_frame()
