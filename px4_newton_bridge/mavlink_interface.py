@@ -28,6 +28,10 @@ class MAVLinkInterface:
         self.sim_dt = cfg["physics"]["dt"]
         self.rng = random.Random(42)  # deterministic sensor noise
         self.mag_offset = cfg["sensors"]["mag"]["offset"]
+        gps_init = cfg["sensors"]["gps"]["init"]
+        self.ref_lat = gps_init["lat"]
+        self.ref_lon = gps_init["lon"]
+        self.ref_alt = gps_init["alt"]
         conn_string = f"tcpin:{ip}:4560"
         logger.info(f"Waiting for PX4 connection on {conn_string}...")
         self.mav = cast(
@@ -362,11 +366,11 @@ class MAVLinkInterface:
             self.last_hil_gps_time = sim_time
 
             # Convert simulation position to GPS coordinates
-            # Using a reference point (Zurich) and adding local offsets
+            # Using the configured reference point and adding local offsets
             # 1 degree latitude ~= 111km, 1 degree longitude ~= 111km * cos(lat)
-            ref_lat = 47.3977418  # Reference latitude
-            ref_lon = 8.5455939  # Reference longitude
-            ref_alt = 488.0  # Reference altitude MSL [m]
+            ref_lat = self.ref_lat
+            ref_lon = self.ref_lon
+            ref_alt = self.ref_alt
 
             # Position offset in meters (x=East, y=North in typical GPS convention)
             # Simulation uses x=forward, y=left, z=up

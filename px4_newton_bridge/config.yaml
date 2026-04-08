@@ -7,5 +7,10 @@ api:
   enabled: false # enable gRPC API for external control
   port: 4561 # gRPC server port
 sensors:
+  gps:
+    init:
+      lat: 47.747944 # [deg]
+      lon: -122.163917 # [deg]
+      alt: 5.02 # [m AMSL]
   mag:
     offset: [0.0, 0.0, 0.0] # [Gauss] hard-iron bias added to mag readings
