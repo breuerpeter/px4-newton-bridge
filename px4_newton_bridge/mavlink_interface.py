@@ -1,6 +1,7 @@
 import math
 import os
 import random
+import time
 from typing import cast
 
 import numpy as np
@@ -249,16 +250,18 @@ class MAVLinkInterface:
             zacc,
         )
 
-    def wait_for_px4(self, current_state: newton.State, body_qd_prev: np.ndarray):
+    def wait_for_px4(self, current_state: newton.State, body_qd_prev: np.ndarray, timeout: float = 2):
         """Send sensor data until PX4 starts responding with actuator controls."""
         logger.info("Waiting for PX4 to start lockstep...")
         sim_time = 0
-        while True:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
             sim_time += self.sim_dt
             self._send_sensor_data(current_state, body_qd_prev, sim_time)
             if self.receive_actuator_controls(timeout=0.05):
                 logger.info("PX4 lockstep established")
                 return sim_time
+        raise ConnectionError(f"PX4 did not respond within {timeout}s")
 
     def _send_sensor_data(self, current_state: newton.State, body_qd_prev: np.ndarray, sim_time: float):
         """Send simulated sensor data to PX4."""
