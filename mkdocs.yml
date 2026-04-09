@@ -36,6 +36,7 @@ nav:
   - Getting Started:
       - Docker: getting-started/docker.md
       - Local: getting-started/local.md
+  - Architecture: architecture.md
   - Vehicles: vehicles.md
   - Conventions: conventions.md
   - Contributing:
