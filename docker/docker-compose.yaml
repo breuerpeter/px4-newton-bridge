@@ -14,6 +14,7 @@ services:
       - UV_LINK_MODE=copy
       - NVIDIA_VISIBLE_DEVICES=void
       - NVIDIA_DRIVER_CAPABILITIES=
+      - RUST_LOG=re_grpc_client=off,re_sdk::recording_stream=off
     working_dir: ${PX4_DIR:-${HOME}/code/px4}
 
 volumes:
