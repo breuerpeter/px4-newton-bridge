@@ -38,10 +38,9 @@ def main():
     sim.sim_time = mav.wait_for_px4(sim.state0, sim._body_qd_prev.numpy())
 
     try:
-        while viewer.is_running():
-            if not viewer.is_paused():
-                sim.step(mav)
-                sim.update_camera()
+        while True:
+            sim.step(mav)
+            sim.update_camera()
             viewer.begin_frame(sim.sim_time)
             viewer.log_state(sim.state0)
             images = sim.get_camera_images()
